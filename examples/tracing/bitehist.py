@@ -16,31 +16,22 @@
 from __future__ import print_function
 from bcc import BPF
 from time import sleep
-import os
-
-# check "blk_account_io_completion" against /proc/kallsyms
-string = os.popen('cat /proc/kallsyms | ' + 
-			'grep "blk_account_io_completion"'
-			).read()
-if len(string.strip()) > 0: 
-    event = "blk_account_io_completion"
-else: 
-    event = "blk_account_io_done"
 
 # load BPF program
 b = BPF(text="""
 #include <uapi/linux/ptrace.h>
 #include <linux/blkdev.h>
+
 BPF_HISTOGRAM(dist);
 BPF_HISTOGRAM(dist_linear);
-int kprobe_blk_account_io_completion(struct pt_regs *ctx, struct request *req)
+
+int kprobe_blk_account_io_done(struct pt_regs *ctx, struct request *req)
 {
 	dist.increment(bpf_log2l(req->__data_len / 1024));
 	dist_linear.increment(req->__data_len / 1024);
 	return 0;
 }
 """)
-b.attach_kprobe(event=event, fn_name='kprobe_blk_account_io_completion')
 
 # header
 print("Tracing... Hit Ctrl-C to end.")
