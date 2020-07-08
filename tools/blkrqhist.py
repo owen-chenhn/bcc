@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # 
-# blkrqhist.py      Instrument two time periods of block layer's I/O requests: queuing time and  
+# blkrqhist.py		Instrument two time periods of block layer's I/O requests: queuing time and  
 #					service time. One histograme is generated for each. Here queuing time is defined 
 #					as the time of an I/O request being queued in kernel, and service time is the 
 #					duration the I/O request being handled by device drivers, up to its completion. 
