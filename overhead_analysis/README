@@ -25,3 +25,12 @@ collects test data by running collect_stat.py script if it judges that all three
 5. To obtain analysis results, run collect_stat.py again with analysis mode on: 
     $ python3 collect_stat.py 1 
 The newest stat csv file in stats/ will contain the analysis results. 
+
+
+Job name format:
+[%iotype-%ioengine-%rwdirection-%blocksize-%iodepth]
+If any field is omitted, default value is used. Default values:
+    iotype: direct. Exceptional case: all mmap io use buffered io, sync=1 and invalidate=1 by default.
+    ioengine: sync
+    blocksize: 4K
+    iodepth: 1. Only when ioengine=libaio, this field has other values

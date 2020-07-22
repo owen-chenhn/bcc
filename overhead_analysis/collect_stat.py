@@ -13,15 +13,6 @@ def cmpr(target, compare):
     formatstr = "%d (%+.2f%%)" if isinstance(target, int) \
                 else "%.2f (%+.2f%%)"
     return formatstr % (target, inc) 
-
-
-head_notes = "Config Notes:\n" \
-            + "Job name format: [%iotype-%ioengine-%rwdirection-%blocksize-%iodepth]\n" \
-            + "If any field is omitted, default value is used. Default values:\n" \
-            + "\tiotype: direct. Exceptional case: all mmap io use buffered io, sync=1 and invalidate=1 by default.\n" \
-            + "\tioengine: sync\n" \
-            + "\tblocksize: 4K\n" \
-            + "\tiodepth: 1. Only when ioengine=libaio, this field has other values\n\n" 
     
 
 mode_map = {
