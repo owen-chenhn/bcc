@@ -8,7 +8,7 @@
 # Copyright (c) Google LLC
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
-# 08-Jun-2020   Haoning CHen   Created this.
+# 08-Jun-2020   Haoning Chen   Created this. 
 
 from __future__ import print_function
 from time import sleep
