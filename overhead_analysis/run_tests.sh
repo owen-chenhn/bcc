@@ -4,10 +4,11 @@
 
 BCC_script=~/bcc/tools/blkrqhist.py
 
-if [ ! -d "job_files" ]; then 
-    echo "Directory job_files not exist" 
+if [ ! -d "job_files" -o -z "$(ls -A ./job_files/)" ] 
+then 
+    echo "No job files. Exit." 
     exit 1 
-done 
+fi 
 if [ ! -d "single_jobs" ]
 then 
     echo "Split job files ..."
@@ -16,19 +17,13 @@ fi
 
 
 function do_test {
-    if [ "$(ls -A ./job_files/)" ] 
-    then 
-        mkdir -p $outdir 
-        for jobfile in ./single_jobs/*      # jobfile=./single_jobs/xxx.fio
-        do 
-            echo "Run job file: $jobfile"
-            filename=${jobfile##*/}
-            sudo perf stat -a -o $outdir/${filename%fio}perf -- fio $jobfile --output=$outdir/${filename%fio}out --output-format="json" --idle-prof=system
-        done
-    else 
-        echo "No job files in dir job_files/" 
-        exit 1
-    fi 
+    mkdir -p $outdir 
+    for jobfile in ./single_jobs/*      # jobfile=./single_jobs/xxx.fio
+    do 
+        echo "Run job file: $jobfile"
+        filename=${jobfile##*/}
+        sudo perf stat -a -o $outdir/${filename%fio}perf -- fio $jobfile --output=$outdir/${filename%fio}out --output-format="json" --idle-prof=system
+    done
 }
 
 
