@@ -8,7 +8,7 @@ import csv
 # compute the increment in percent of target from compare
 def cmpr(target, compare): 
     if compare == 0: 
-        return "0 (0%%)" 
+        return "0 (0)" 
     inc = (target - compare) / compare * 100 
     formatstr = "%d (%+.2f%%)" if isinstance(target, int) \
                 else "%.2f (%+.2f%%)"
