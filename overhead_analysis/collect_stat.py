@@ -5,7 +5,7 @@ from datetime import datetime
 import csv 
 
 
-# compute the increment in percent of target from compare
+# function to compute increment in percent of target from compare
 def cmpr(target, compare): 
     if compare == 0: 
         return "0 (0)" 
@@ -13,7 +13,7 @@ def cmpr(target, compare):
     formatstr = "%d (%+.2f%%)" if isinstance(target, int) \
                 else "%.2f (%+.2f%%)"
     return formatstr % (target, inc) 
-    
+
 
 mode_map = {
     "output": "no-trace", 
@@ -35,25 +35,16 @@ for outdir in ["output", "output-ebpf", "output-blkhist"]:
             with open(file_path, 'r') as fio_f:
                 fio_json = json.load(fio_f) 
             fio_job = fio_json["jobs"][0] 
-            r_stat, w_stat = fio_job["read"], fio_job["write"]
+            fio_stat = fio_job["read"] 
+            if fio_stat["bw"] == 0: 
+                fio_stat = fio_job["write"]
             job_stat["lat"] = {
-                "r": {
-                    "mean": round(r_stat["lat"]["mean"], 2),
-                    "50p": r_stat["clat"]["percentile"]["50.000000"], 
-                    "90p": r_stat["clat"]["percentile"]["90.000000"],
-                    "99p": r_stat["clat"]["percentile"]["99.990000"]
-                }, 
-                "w": {
-                    "mean": round(w_stat["lat"]["mean"], 2),
-                    "50p": w_stat["clat"]["percentile"]["50.000000"], 
-                    "90p": w_stat["clat"]["percentile"]["90.000000"],
-                    "99p": w_stat["clat"]["percentile"]["99.990000"]
-                }
+                "mean": round(fio_stat["lat"]["mean"], 2),
+                "50p": fio_stat["clat"]["percentile"]["50.000000"], 
+                "90p": fio_stat["clat"]["percentile"]["90.000000"],
+                "99p": fio_stat["clat"]["percentile"]["99.990000"]
             }
-            job_stat["bw"] = {
-                "r": r_stat["bw"], 
-                "w": w_stat["bw"]
-            }
+            job_stat["bw"] = fio_stat["bw"] 
         else: 
             cpu = os.popen("cat %s | grep 'cpu-clock'" % file_path) \
                     .read().strip().split(' ')[0]
@@ -72,48 +63,27 @@ with open("stats/stat-%s.json" % timestamp, "w") as json_w:
 
 with open("stats/stat-%s.csv" % timestamp, "w") as csv_w: 
     writer = csv.writer(csv_w) 
-    writer.writerow(["Job name", "Lat(us)-R-NoTrace", "50 Percentile", "90 Percentile", "99 Percentile",  
-            "Lat(us)-W-NoTrace", "50 Percentile", "90 Percentile", "99 Percentile", 
-            "BW(KB/s)-R-NoTrace", "BW(KB/s)-W-NoTrace", "CPU-NoTrace", 
-            "Lat(us)-R-eBpf", "50 Percentile", "90 Percentile", "99 Percentile", 
-            "Lat(us)-W-eBpf", "50 Percentile", "90 Percentile", "99 Percentile", 
-            "BW(KB/s)-R-eBpf", "BW(KB/s)-W-eBpf", "CPU-eBpf", 
-            "Lat(us)-R-Blkhist", "50 Percentile", "90 Percentile", "99 Percentile", 
-            "Lat(us)-W-Blkhist", "50 Percentile", "90 Percentile", "99 Percentile", 
-            "BW(KB/s)-R-Blkhist", "BW(KB/s)-W-Blkhist", "CPU-Blkhist"])
+    writer.writerow(["Job name", "Lat(us)-NoTrace", "50 Percentile", "90 Percentile", "99 Percentile",  
+            "BW(KB/s)-NoTrace", "CPU-NoTrace", 
+            "Lat(us)-eBpf", "50 Percentile", "90 Percentile", "99 Percentile",  
+            "BW(KB/s)-eBpf", "CPU-eBpf", 
+            "Lat(us)-BlkHist", "50 Percentile", "90 Percentile", "99 Percentile",  
+            "BW(KB/s)-BlkHist", "CPU-BlkHist"])
 
     for job_name in sorted(stat.keys()): 
         nt_stat, ebpf_stat, blkhist_stat = stat[job_name]["no-trace"], stat[job_name]["ebpf"], stat[job_name]["blkhist"]
 
-        nt_lat_r, nt_lat_w = nt_stat["lat"]["r"], nt_stat["lat"]["w"]
-        nt_bw_r, nt_bw_w = nt_stat["bw"]["r"], nt_stat["bw"]["w"] 
-        nt_cpu = nt_stat["cpu"]
-
-        ebpf_lat_r, ebpf_lat_w = ebpf_stat["lat"]["r"], ebpf_stat["lat"]["w"]
-        ebpf_bw_r, ebpf_bw_w = ebpf_stat["bw"]["r"], ebpf_stat["bw"]["w"] 
-        ebpf_cpu = ebpf_stat["cpu"]
-
-        blkhist_lat_r, blkhist_lat_w = blkhist_stat["lat"]["r"], blkhist_stat["lat"]["w"]
-        blkhist_bw_r, blkhist_bw_w = blkhist_stat["bw"]["r"], blkhist_stat["bw"]["w"] 
-        blkhist_cpu = blkhist_stat["cpu"]
+        nt_lat, nt_bw, nt_cpu = nt_stat["lat"], nt_stat["bw"], nt_stat["cpu"]
+        ebpf_lat, ebpf_bw, ebpf_cpu = ebpf_stat["lat"], ebpf_stat["bw"], ebpf_stat["cpu"]
+        blkhist_lat, blkhist_bw, blkhist_cpu = blkhist_stat["lat"], blkhist_stat["bw"], blkhist_stat["cpu"]
 
         if analyflag: 
-            writer.writerow([job_name, nt_lat_r["mean"], nt_lat_r["50p"], nt_lat_r["90p"], nt_lat_r["99p"], 
-                    nt_lat_w["mean"], nt_lat_w["50p"], nt_lat_w["90p"], nt_lat_w["99p"], 
-                    nt_bw_r, nt_bw_w, nt_cpu, 
-                    cmpr(ebpf_lat_r["mean"], nt_lat_r["mean"]), ebpf_lat_r["50p"], ebpf_lat_r["90p"], ebpf_lat_r["99p"], 
-                    cmpr(ebpf_lat_w["mean"], nt_lat_w["mean"]), ebpf_lat_w["50p"], ebpf_lat_w["90p"], ebpf_lat_w["99p"], 
-                    cmpr(ebpf_bw_r, nt_bw_r), cmpr(ebpf_bw_w, nt_bw_w), cmpr(ebpf_cpu, nt_cpu), 
-                    cmpr(blkhist_lat_r["mean"], nt_lat_r["mean"]), blkhist_lat_r["50p"], blkhist_lat_r["90p"], blkhist_lat_r["99p"], 
-                    cmpr(blkhist_lat_w["mean"], nt_lat_w["mean"]), blkhist_lat_w["50p"], blkhist_lat_w["90p"], blkhist_lat_w["99p"], 
-                    cmpr(blkhist_bw_r, nt_bw_r), cmpr(blkhist_bw_w, nt_bw_w), cmpr(blkhist_cpu, nt_cpu)])  
+            writer.writerow([job_name, nt_lat["mean"], nt_lat["50p"], nt_lat["90p"], nt_lat["99p"], nt_bw, nt_cpu, 
+                    cmpr(ebpf_lat["mean"], nt_lat["mean"]), ebpf_lat["50p"], ebpf_lat["90p"], ebpf_lat["99p"], 
+                    cmpr(ebpf_bw, nt_bw), cmpr(ebpf_cpu, nt_cpu), 
+                    cmpr(blkhist_lat["mean"], nt_lat["mean"]), blkhist_lat["50p"], blkhist_lat["90p"], blkhist_lat["99p"], 
+                    cmpr(blkhist_bw, nt_bw), cmpr(blkhist_cpu, nt_cpu)]) 
         else: 
-            writer.writerow([job_name, nt_lat_r["mean"], nt_lat_r["50p"], nt_lat_r["90p"], nt_lat_r["99p"], 
-                    nt_lat_w["mean"], nt_lat_w["50p"], nt_lat_w["90p"], nt_lat_w["99p"], 
-                    nt_bw_r, nt_bw_w, nt_cpu, 
-                    ebpf_lat_r["mean"], ebpf_lat_r["50p"], ebpf_lat_r["90p"], ebpf_lat_r["99p"], 
-                    ebpf_lat_w["mean"], ebpf_lat_w["50p"], ebpf_lat_w["90p"], ebpf_lat_w["99p"], 
-                    ebpf_bw_r, ebpf_bw_w, ebpf_cpu, 
-                    blkhist_lat_r["mean"], blkhist_lat_r["50p"], blkhist_lat_r["90p"], blkhist_lat_r["99p"], 
-                    blkhist_lat_w["mean"], blkhist_lat_w["50p"], blkhist_lat_w["90p"], blkhist_lat_w["99p"], 
-                    blkhist_bw_r, blkhist_bw_w, blkhist_cpu]) 
+            writer.writerow([job_name, nt_lat["mean"], nt_lat["50p"], nt_lat["90p"], nt_lat["99p"], nt_bw, nt_cpu, 
+                    ebpf_lat["mean"], ebpf_lat["50p"], ebpf_lat["90p"], ebpf_lat["99p"], ebpf_bw, ebpf_cpu, 
+                    blkhist_lat["mean"], blkhist_lat["50p"], blkhist_lat["90p"], blkhist_lat["99p"], blkhist_bw, blkhist_cpu]) 

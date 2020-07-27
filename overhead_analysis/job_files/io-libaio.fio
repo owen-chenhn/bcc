@@ -1,71 +1,40 @@
 [global]
 filename=/dev/sdb
 ioengine=libaio
-direct=1
 iodepth=1
+direct=1
 runtime=60
+ramp_time=30
 time_based=1
 
 [libaio-read-04K] 
 rw=read
 bs=4k
 
-[libaio-read-16K]
-rw=read
-bs=16k
-
 [libaio-read-64K]
 rw=read
 bs=64k
-
-[libaio-read-256K]
-rw=read
-bs=256k
 
 [libaio-write-04K]
 rw=write
 bs=4k
 
-[libaio-write-16K]
-rw=write
-bs=16k
-
 [libaio-write-64K]
 rw=write
 bs=64k
-
-[libaio-write-256K]
-rw=write
-bs=256k
 
 [libaio-randread-04K]
 rw=randread
 bs=4k
 
-[libaio-randread-16K]
-rw=randread
-bs=16k
-
 [libaio-randread-64K]
 rw=randread
 bs=64k
-
-[libaio-randread-256K]
-rw=randread
-bs=256k
 
 [libaio-randwrite-04K]
 rw=randwrite
 bs=4k
 
-[libaio-randwrite-16K]
-rw=randwrite
-bs=16k
-
 [libaio-randwrite-64K]
 rw=randwrite
 bs=64k
-
-[libaio-randwrite-256K]
-rw=randwrite
-bs=256k

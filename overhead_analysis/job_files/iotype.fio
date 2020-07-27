@@ -1,40 +1,38 @@
 [global]
 filename=/dev/sdb
+buffered=1
 runtime=60
+ramp_time=30
 time_based=1
 
-[buffered-libaio-rw] 
-ioengine=libaio
-rw=rw 
-
-[buffered-libaio-randrw]
-ioengine=libaio
-rw=randrw 
-
-[buffered-sync-rw] 
+[buffered-sync-read] 
 ioengine=sync
-rw=rw 
+rw=read 
 
-[buffered-sync-randrw] 
+[buffered-sync-write] 
 ioengine=sync
-rw=randrw 
+rw=write 
 
-[direct-libaio-rw] 
-direct=1
+[buffered-sync-randread] 
+ioengine=sync
+rw=randread 
+
+[buffered-sync-randwrite] 
+ioengine=sync
+rw=randwrite 
+
+[buffered-libaio-read] 
 ioengine=libaio
-rw=rw 
+rw=read 
 
-[direct-libaio-randrw] 
-direct=1
+[buffered-libaio-write] 
 ioengine=libaio
-rw=randrw 
+rw=write 
 
-[direct-sync-rw] 
-direct=1
-ioengine=sync
-rw=rw 
+[buffered-libaio-randread] 
+ioengine=libaio
+rw=randread 
 
-[direct-sync-randrw] 
-direct=1
-ioengine=sync
-rw=randrw 
+[buffered-libaio-randwrite] 
+ioengine=libaio
+rw=randwrite 
