@@ -15,7 +15,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 08-Jun-2020   Haoning Chen   Created this. 
-# 03-Aug-2020	Haoning Chen   Added raw tracepoint implementation. 
+# 03-Aug-2020   Haoning Chen   Added raw tracepoint implementation. 
 
 from __future__ import print_function
 from time import sleep
@@ -99,7 +99,6 @@ RAW_TRACEPOINT_PROBE(block_rq_complete) {
 
 if len(sys.argv) > 1 and sys.argv[1] == 'T': 	# use tracepoint 
 	bpf = BPF(text=bpf_text_head+bpf_text_tracepoint) 
-	bpf.attach_raw_tracepoint(tp="block_rq_complete", fn_name="trace_rq_complete") 
 
 else:		# default: use kprobe
 	bpf = BPF(text=bpf_text_head+bpf_text_kprobe) 
