@@ -1,14 +1,13 @@
 #!/usr/bin/python
 # 
-# blkrqhist.py		Instrument two time periods of block layer's I/O requests: queuing time and  
-#			service time. One histograme is generated for each. Here queuing time is defined 
-#			as the time of an I/O request being queued in kernel, and service time is the 
-#			duration the I/O request being handled by device drivers, up to its completion. 
+# blkrqhist.py     Generate latency histograms for queuing time and service time respectively. Here 
+#                  queuing time is defined as the time of an I/O request being queued in the kernel, 
+#                  and service time is that it being processed by device drivers, until completion. 
 # 
 # 
 # Usage: 
-# To run with Kprobe implementation (by default):	./blkrqhist.py
-# With Raw tracepoint implementation: 			./blkrqhist.py T 
+# To run with Kprobe implementation (by default):  ./blkrqhist.py
+# With Raw tracepoint implementation:              ./blkrqhist.py -T 
 #
 #
 # Copyright (c) Google LLC
@@ -20,7 +19,21 @@
 from __future__ import print_function
 from time import sleep
 from bcc import BPF 
-import sys 
+import argparse
+
+# parse arguments
+examples = """examples:
+    ./blkrqhist.py       # use kprobe (default) implementation
+    ./blkrqhist.py -T    # use raw tracepoint implementation
+"""
+parser = argparse.ArgumentParser(
+	description="Latency histograms for block I/O requests",
+	formatter_class=argparse.RawDescriptionHelpFormatter,
+	epilog=examples)
+parser.add_argument("-T", "--tp", action="store_true",
+	help="use raw tracepoint implementation")
+args = parser.parse_args()
+
 
 # BPF program
 bpf_text_head = """
@@ -97,7 +110,7 @@ RAW_TRACEPOINT_PROBE(block_rq_complete) {
 """
 
 
-if len(sys.argv) > 1 and sys.argv[1] == 'T': 	# use tracepoint 
+if args.tp: 	# use tracepoint 
 	bpf = BPF(text=bpf_text_head+bpf_text_tracepoint) 
 
 else:		# default: use kprobe
@@ -123,4 +136,3 @@ except KeyboardInterrupt:
 bpf["que_hist"].print_log2_hist("Queuing time (us)")
 print(end="\n\n")
 bpf["serv_hist"].print_log2_hist("Service time (us)")
-
