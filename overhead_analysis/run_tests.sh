@@ -1,28 +1,18 @@
 # Run fio tests on different modes: 0 - blockhisto disabled; 1 - blockhisto enabled
-# Place the fio job files in directory "job_files"
-# Modify the varible BCC_script in this file to point to the bcc script that is going to run
+# Place the fio job files in directory "job_files". 
 
-BCC_script=~/bcc/tools/blkrqhist.py
-
-if [ ! -d "job_files" -o -z "$(ls -A ./job_files/)" ] 
-then 
-    echo "No job files. Exit." 
-    exit 1 
-fi 
-if [ ! -d "single_jobs" ]
-then 
-    echo "Split job files ..."
-    python3 split_jobs.py
-fi 
+BCC=../bcc      # specify path to bcc script here
 
 
 function do_test {
     mkdir -p $outdir 
-    for jobfile in ./single_jobs/*      # jobfile=./single_jobs/xxx.fio
-    do 
-        echo "Run job file: $jobfile"
-        filename=${jobfile##*/}
-        sudo perf stat -a -o $outdir/${filename%fio}perf -- fio $jobfile --output=$outdir/${filename%fio}out --output-format="json" --idle-prof=system
+    for jobfile in ./job_files/*; do      # jobfile=./job_files/xxx.fio 
+        for job in $(grep -o "\[.*\]" $jobfile | awk -F "[\[\]]" '{print $2}'); do
+            if [ $job != "global" ]; then
+                echo "Run job: $job at file: $jobfile"
+                sudo perf stat -a -o $outdir/${job}.perf -- fio $jobfile --section=$job --output=$outdir/${job}.out --output-format="json" --idle-prof=system
+            fi
+        done
     done
 }
 
@@ -49,9 +39,9 @@ do
     then
         outdir=./output-ebpf
         echo "Run with eBpf tracing"
-        sudo python $BCC_script &  # run ebpf script at backgroud 
+        sudo python $BCC/blkrqhist.py &  # run ebpf script at backgroud 
         pid=$!
-        sleep 3     # ensure tracing tool has started
+        sleep 5     # ensure tracing tool has started
 
     else
         outdir=""
@@ -74,10 +64,9 @@ done
 
 if [ -d ./output -a -d ./output-ebpf -a -d ./output-blkhist ]
 then 
-    mkdir -p stats 
+    mkdir -p stats
     echo "Collecting stat ..."
     python3 collect_stat.py
     echo "Tests finished. Stats are stored in directory stats/"
-    echo "To obtain analysis results, run again the python script with analysis mode on:"
-    echo "$ python3 collect_stat.py 1"
 fi
+
