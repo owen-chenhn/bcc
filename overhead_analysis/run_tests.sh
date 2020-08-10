@@ -1,3 +1,4 @@
+#!/bin/bash
 # Run fio tests on different modes: 0 - blockhisto disabled; 1 - blockhisto enabled
 # Place the fio job files in directory "job_files". 
 
@@ -10,7 +11,17 @@ function do_test {
         for job in $(grep -o "\[.*\]" $jobfile | awk -F "[\[\]]" '{print $2}'); do
             if [ $job != "global" ]; then
                 echo "Run job: $job at file: $jobfile"
-                sudo perf stat -a -o $outdir/${job}.perf -- fio $jobfile --section=$job --output=$outdir/${job}.out --output-format="json" --idle-prof=system
+                # stash cpu info
+                cpu_before=($(head -n1 /proc/stat | awk '{print $2,$3,$4,$5,$6,$7,$8,$9,$10,$11}'))
+
+                sudo fio $jobfile --section=$job --output=$outdir/${job}.out --output-format="json"
+
+                cpu_after=($(head -n1 /proc/stat | awk '{print $2,$3,$4,$5,$6,$7,$8,$9,$10,$11}'))
+                len=${#cpu_after[@]}
+                for ((i=0; i<$len; i++)); do
+                    cpu_after[i]=$((${cpu_after[i]}-${cpu_before[i]}))
+                done
+                echo ${cpu_after[@]} > $outdir/${job}.perf
             fi
         done
     done
@@ -41,7 +52,7 @@ do
         echo "Run with eBpf tracing"
         sudo python $BCC/blkrqhist.py &  # run ebpf script at backgroud 
         pid=$!
-        sleep 5     # ensure tracing tool has started
+        sleep 3     # ensure tracing tool has started
 
     else
         outdir=""
@@ -68,5 +79,4 @@ then
     echo "Collecting stat ..."
     python3 collect_stat.py
     echo "Tests finished. Stats are stored in directory stats/"
-fi
-
+fi 
