@@ -21,7 +21,7 @@ function do_test {
                 duration=$SECONDS
                 len=${#cpu_after[@]}
                 for ((i=0; i<$len; i++)); do
-                    cpu_after[i]=$(( (${cpu_after[i]}-${cpu_before[i]})/$duration ))
+                    cpu_after[i]=$(echo "scale=4; (${cpu_after[i]}-${cpu_before[i]})/$duration" |bc)
                 done
                 echo ${cpu_after[@]} > $outdir/${job}.perf
             fi
@@ -54,7 +54,7 @@ do
         echo "Run with eBpf tracing"
         sudo python $BCC/blkrqhist.py &  # run ebpf script at backgroud 
         pid=$!
-        sleep 3     # ensure tracing tool has started
+        sleep 5     # ensure tracing tool has started
 
     else
         outdir=""
