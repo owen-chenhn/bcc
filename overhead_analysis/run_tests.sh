@@ -12,14 +12,16 @@ function do_test {
             if [ $job != "global" ]; then
                 echo "Run job: $job at file: $jobfile"
                 # stash cpu info
+                SECONDS=0
                 cpu_before=($(head -n1 /proc/stat | awk '{print $2,$3,$4,$5,$6,$7,$8,$9,$10,$11}'))
 
                 sudo fio $jobfile --section=$job --output=$outdir/${job}.out --output-format="json"
 
                 cpu_after=($(head -n1 /proc/stat | awk '{print $2,$3,$4,$5,$6,$7,$8,$9,$10,$11}'))
+                duration=$SECONDS
                 len=${#cpu_after[@]}
                 for ((i=0; i<$len; i++)); do
-                    cpu_after[i]=$((${cpu_after[i]}-${cpu_before[i]}))
+                    cpu_after[i]=$(( (${cpu_after[i]}-${cpu_before[i]})/$duration ))
                 done
                 echo ${cpu_after[@]} > $outdir/${job}.perf
             fi
