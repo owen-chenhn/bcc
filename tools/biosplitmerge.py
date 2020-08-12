@@ -1,9 +1,13 @@
 #!/usr/bin/python
 # 
-# biosplitmerge.py      description here ...
-#                       next line ...
+# biosplitmerge.py      Block layer tracer that traces bio struct's 
+#                       split and merge. Whenever a split/merge event
+#                       happens, the full data of the event is emitted.
 # 
 # Usage: 
+# Trace both split and merge event:  ./biosplitmerge.py
+# Trace split events only:           ./biosplitmerge.py -S
+# Trace merge events only:           ./biosplitmerge.py -M
 #
 #
 # Copyright (c) Google LLC

@@ -1,7 +1,7 @@
 /* 
  * biosplitmerge.c      The eBPF C source file for split and merge tracer. 
  *                      Functions in this file are imported and used by 
- *                      biosplit.py and biomerge.py. 
+ *                      biosplitmerge.py. 
  *
  *
  * Copyright (c) Google LLC
@@ -70,20 +70,25 @@ int split_entry(struct pt_regs *ctx, struct bio *bio) {
 
 
 /* Function probed to entry of bio_attempt_front_merge(). */
-int front_merge_entry(struct pt_regs *ctx, struct bio *bio) {
+int front_merge_entry(struct pt_regs *ctx) {
+	// obtain the second param of the function
+	struct bio *bio = (struct bio *)PT_REGS_PARM2(ctx);
 	do_entry(Fmerge, bio);
 	return 0;
 }
 
-
 /* Function probed to entry of bio_attempt_back_merge(). */
-int back_merge_entry(struct pt_regs *ctx, struct bio *bio) {
+int back_merge_entry(struct pt_regs *ctx) {
+	// obtain the second param of the function
+	struct bio *bio = (struct bio *)PT_REGS_PARM2(ctx);
 	do_entry(Bmerge, bio);
 	return 0;
 }
 
+
 /* Function probed to entry of bio_attempt_discard_merge(). */
-int discard_merge_entry(struct pt_regs *ctx, struct bio *bio) {
+int discard_merge_entry(struct pt_regs *ctx) {
+	struct bio *bio = (struct bio *)PT_REGS_PARM3(ctx);
 	do_entry(Dmerge, bio);
 	return 0;
 }
