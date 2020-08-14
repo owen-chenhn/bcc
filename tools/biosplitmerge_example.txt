@@ -1,0 +1,39 @@
+Demonstrations of biosplitmerge, the Linux eBPF/bcc version.
+
+This tool traces bio struct's split and merge in the block layer. When a bio struct gets split, 
+it is split into two bios; while it gets merged, it is merged into an existing request struct. 
+The tool monitors the split/merge events, and emit the full data of the events when they happen.
+
+
+Usage:
+# ./biosplitmerge.py       Trace both split and merge events.
+# ./biosplitmerge.py -S    Trace split events only.
+# ./biosplitmerge.py -M    Trace merge events only.
+
+Sample output:
+TIME(s)     EVENT         COMMAND        PID    DISK    T  IN-SECTOR   IN-BYTES OUT-SECTOR  OUT-BYTES
+0.0000      Split         dd             1262   sdb     W     282624    2097152     282624    1310720
+0.0118      Split         dd             1262   sdb     W     286720    2097152     286720    1310720
+4.2098      Split         dd             1263   sdb     W     290816    2097152     290816    1310720
+4.2206      Split         dd             1263   sdb     W     294912    2097152     294912    1310720
+5.9670      Back Merge    jbd2/sdb-8     182    sdb     W   21241904       4096   21241896       8192
+5.9677      Back Merge    jbd2/sdb-8     182    sdb     W   21241912       4096   21241896      12288
+5.9678      Back Merge    jbd2/sdb-8     182    sdb     W   21241920       4096   21241896      16384
+5.9679      Back Merge    jbd2/sdb-8     182    sdb     W   21241928       4096   21241896      20480
+5.9680      Back Merge    jbd2/sdb-8     182    sdb     W   21241936       4096   21241896      24576
+5.9683      Back Merge    jbd2/sdb-8     182    sdb     W   21241944       4096   21241896      28672
+5.9670      Back Merge    jbd2/sda-8     91     sda     W    8666912       4096    8666904       8192
+
+
+The output contains the split/merge event information about:
+"TIME": duration lasted from the first monitored event.
+"EVENT": type of the event. Can be one of: Split, Front Merge, Back Merge, Discard Merge.
+"COMMAND": process command of the event. 
+"PID": process id of the event.
+"DISK": target disk the bio is issued to. 
+"T": read/write io type. 
+"IN-SECTOR": disk sector number of the input bio (the bio that gets split/merged).
+"IN-BYTES": io size of the input bio.
+"OUT-SECTOR": disk sector number of the output struct, which is the new bio getting split out, 
+        or the request struct that input bio is merged into.
+"OUT-BYTES": io size of the output struct. 
