@@ -12,6 +12,7 @@
 
 #include <uapi/linux/ptrace.h>
 #include <linux/blkdev.h>
+#include <linux/version.h>
 
 /* Split/Merge event type. */
 enum type { Split = 0, Fmerge, Bmerge, Dmerge };
@@ -57,7 +58,7 @@ static inline void do_entry(enum type event_type, struct bio *bio) {
 		.sector = bi_iter.bi_sector, 
 		.len    = bi_iter.bi_size,
 		.type   = (u64) event_type
-    }; 
+	}; 
 	input.update(&pid, &val);
 }
 
@@ -72,15 +73,23 @@ int split_entry(struct pt_regs *ctx, struct bio *bio) {
 /* Function probed to entry of bio_attempt_front_merge(). */
 int front_merge_entry(struct pt_regs *ctx) {
 	// obtain the second param of the function
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)
 	struct bio *bio = (struct bio *)PT_REGS_PARM2(ctx);
+#else 
+	struct bio *bio = (struct bio *)PT_REGS_PARM3(ctx);
+#endif
 	do_entry(Fmerge, bio);
 	return 0;
 }
 
 /* Function probed to entry of bio_attempt_back_merge(). */
 int back_merge_entry(struct pt_regs *ctx) {
-	// obtain the second param of the function
+	// obtain the bio argument of the function
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)
 	struct bio *bio = (struct bio *)PT_REGS_PARM2(ctx);
+#else 
+	struct bio *bio = (struct bio *)PT_REGS_PARM3(ctx);
+#endif
 	do_entry(Bmerge, bio);
 	return 0;
 }
