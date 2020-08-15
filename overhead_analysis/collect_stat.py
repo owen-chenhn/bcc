@@ -59,9 +59,10 @@ for outdir in os.listdir("."):
             writer = csv.writer(csv_w) 
             writer.writerow(["Job name", "Lat(us)", "50 Percentile", "90 Percentile", "99 Percentile", "BW(KB/s)",
                     "CPU-user", "CPU-nice", "CPU-system", "CPU-idle", "CPU-iowait", "CPU-irq", "CPU-softirq", 
-                    "CPU-steal", "CPU-guest", "CPU-guest_nice"])
+                    "CPU-steal", "CPU-guest", "CPU-guest_nice", "CPU-total", "CPU-per-io"])
 
             for job_name in sorted(stat.keys()): 
                 job_stat = stat[job_name]
+                cpu_util = sum(job_stat["cpu"][:3] + job_stat["cpu"][5:])
                 writer.writerow([job_name, job_stat["lat"]["mean"], job_stat["lat"]["50p"], job_stat["lat"]["90p"], 
-                        job_stat["lat"]["99p"], job_stat["bw"]] + job_stat["cpu"])
+                        job_stat["lat"]["99p"], job_stat["bw"]] + job_stat["cpu"] + [cpu_util, cpu_util*4./job_stat["bw"]])
