@@ -63,6 +63,6 @@ for outdir in os.listdir("."):
 
             for job_name in sorted(stat.keys()): 
                 job_stat = stat[job_name]
-                cpu_util = sum(job_stat["cpu"][:3] + job_stat["cpu"][5:])
+                cpu_util = sum(map(float, job_stat["cpu"][:3] + job_stat["cpu"][5:]))
                 writer.writerow([job_name, job_stat["lat"]["mean"], job_stat["lat"]["50p"], job_stat["lat"]["90p"], 
                         job_stat["lat"]["99p"], job_stat["bw"]] + job_stat["cpu"] + [cpu_util, cpu_util*4./job_stat["bw"]])
