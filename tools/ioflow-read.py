@@ -1,9 +1,10 @@
 #!/usr/bin/python
 # 
-# ioflow-.py        End-to-end IO Flow Tracer for read() syscall. 
+# ioflow-read.py        End-to-end IO Flow Tracer for read() syscall. 
 # 
 # Usage: 
-# 
+#    ./ioflow-read.py           # Default time threshold to 1ms. 
+#    ./ioflow-read.py -t 5      # Print full data if an IO has total latency that exceeds 5ms.
 #
 #
 # Copyright (c) Google LLC
@@ -53,9 +54,10 @@ print("Tracing read I/Os... Hit Ctrl-C to end and display histograms.")
 print("IO time threshold: %.1fms." % args.threshold)
 print("Any IO that takes time longer than this value gets emitted here (in us):\n")
 
-print("%8s %8s %10s %9s %14s %8s %5s %8s %5s %8s %5s %14s %6s %10s %8s %8s %6s" % (
-    "TOTAL", "VFS", "PAGE_CACHE", "READ_PAGE", "EXT4_READ_PAGE", "BLOCK", "COUNT", "SPLIT", 
-    "COUNT", "MERGE", "COUNT", "REQUEST_HANDLE", "PID", "COMM", "OFFSET", "SIZE", "FILE"))
+print("%9s %8s %10s %11s %9s %10s %14s %14s %9s %8s %8s %5s %11s %9s %9s %5s %11s %9s %9s %5s %10s %11s %6s %10s %8s %8s %6s" % (
+    "TOTAL_LAT", "VFS_LAT", "PGCACHE_TS", "PGCACHE_LAT", "READPG_TS", "READPG_LAT", "EXT4READPG_TS", "EXT4READPG_LAT", 
+    "BLK_START", "BLK_LAT", "BLK_END", "COUNT", "SPLIT_START", "SPLIT_LAT", "SPLIT_END", "COUNT", "MERGE_START", 
+    "MERGE_LAT", "MERGE_END", "COUNT", "REQUEST_TS", "REQUEST_LAT", "PID", "COMMAND", "OFFSET", "SIZE", "FILE"))
 
 # process event 
 def print_event(cpu, data, size):
@@ -63,11 +65,23 @@ def print_event(cpu, data, size):
 
     total = float(event.total) / 1000
     if total >= (args.threshold * 1000):
-        print("%8.2f %8.2f %10.2f %9.2f %14.2f %8.2f %5s %8.2f %5s %8.2f %5s %14.2f %6s %10s %8s %8s %10s" 
-            % (total, float(event.vfs)/1000, float(event.pgcache)/1000, float(event.readpg)/1000, 
-            float(event.ext4readpg)/1000, float(event.blk)/1000, event.cnt_blk, float(event.split)/1000, 
-            event.cnt_split, float(event.merge)/1000, event.cnt_merge, float(event.request)/1000, 
-            event.pid, event.cmd_name, event.offset, event.size, event.file_name))
+        ts_pgcache = float(event.ts_pgcache - event.ts_vfs) / 1000 if event.ts_pgcache > 0 else 0.
+        ts_readpg = float(event.ts_readpg - event.ts_vfs) / 1000 if event.ts_readpg > 0 else 0.
+        ts_ext4readpg = float(event.ts_ext4readpg - event.ts_vfs) / 1000 if event.ts_ext4readpg > 0 else 0.
+        ts_blk_start = float(event.ts_blk_start - event.ts_vfs) / 1000 if event.ts_blk_start > 0 else 0.
+        ts_blk_end = float(event.ts_blk_end - event.ts_vfs) / 1000 if event.ts_blk_end > 0 else 0.
+        ts_split_start = float(event.ts_split_start - event.ts_vfs) / 1000 if event.ts_split_start > 0 else 0.
+        ts_split_end = float(event.ts_split_end - event.ts_vfs) / 1000 if event.ts_split_end > 0 else 0.
+        ts_merge_start = float(event.ts_merge_start - event.ts_vfs) / 1000 if event.ts_merge_start > 0 else 0.
+        ts_merge_end = float(event.ts_merge_end - event.ts_vfs) / 1000 if event.ts_merge_end > 0 else 0.
+        ts_request = float(event.ts_request - event.ts_vfs) / 1000 if event.ts_request > 0 else 0.
+
+        print("%9.3f %8.3f %10.3f %11.3f %9.3f %10.3f %14.3f %14.3f %9.3f %8.3f %8.3f %5s %11.3f %9.3f %9.3f %5s %11.3f %9.3f %9.3f %5s %10.3f %11.3f %6s %10s %8s %8s %6s" 
+            % (total, float(event.vfs)/1000, ts_pgcache, float(event.pgcache)/1000, ts_readpg, float(event.readpg)/1000, 
+            ts_ext4readpg, float(event.ext4readpg)/1000, ts_blk_start, float(event.blk)/1000, ts_blk_end, event.cnt_blk, 
+            ts_split_start, float(event.split)/1000, ts_split_end, event.cnt_split, ts_merge_start, float(event.merge)/1000, 
+            ts_merge_end, event.cnt_merge, ts_request, float(event.request)/1000, event.pid, event.cmd_name, event.offset, 
+            event.size, event.file_name))
 
 # loop with callback to print_event
 bpf["events"].open_perf_buffer(print_event, page_cnt=128)

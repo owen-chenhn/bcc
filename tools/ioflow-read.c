@@ -1,5 +1,5 @@
 /* 
- * ioflow-.c        description ...
+ * ioflow-read.c        description ...
  *
  *
  * Copyright (c) Google LLC
@@ -20,12 +20,20 @@ struct val_t {
     u64 ts_readpg;
     u64 ts_ext4readpg;
 
-    // The latest entry time in the block layer. 
-    u64 ts_blk_first;   // The first time entering the block layer
+    // Block layer. Updated each time.
     u64 ts_blk;
     u64 ts_split;
     u64 ts_merge;
-    u64 ts_request;
+    // Start and end time in block layer
+    u64 ts_blk_start;
+    u64 ts_blk_end;
+    u64 ts_split_start;
+    u64 ts_split_end;
+    u64 ts_merge_start;
+    u64 ts_merge_end;
+
+    u64 ts_request;     // The first time when a request is submitted to request queue. 
+    
     // Accumulated latency for each section in the block layer
     u64 lat_blk;
     u64 lat_split;
@@ -39,6 +47,7 @@ struct val_t {
     char file_name[DNAME_INLINE_LEN];
 };
 
+
 /* Output data sent from kernel to user space. */
 struct data_t {
     // Latency in each stage
@@ -46,15 +55,26 @@ struct data_t {
     u64 pgcache;
     u64 readpg;
     u64 ext4readpg;
-
     // Accumulated latency of each stage in Block layer
     u64 blk;
     u64 split;
     u64 merge;
     u64 request;
-
     // Total latency
     u64 total;
+
+    // Timestamps
+    u64 ts_vfs;
+    u64 ts_pgcache;
+    u64 ts_readpg;
+    u64 ts_ext4readpg;
+    u64 ts_blk_start;
+    u64 ts_blk_end;
+    u64 ts_split_start;
+    u64 ts_split_end;
+    u64 ts_merge_start;
+    u64 ts_merge_end;
+    u64 ts_request;
 
     u64 cnt_blk;
     u64 cnt_split;
@@ -133,8 +153,8 @@ int block_entry(struct pt_regs *ctx) {
     if (valp) {
         valp->cnt_blk++;
         valp->ts_blk = ts;
-        if (valp->ts_blk_first == 0)
-            valp->ts_blk_first = ts;
+        if (valp->ts_blk_start == 0)
+            valp->ts_blk_start = ts;
     }
     return 0;
 }
@@ -145,6 +165,7 @@ int block_return(struct pt_regs *ctx) {
     struct val_t *valp = map.lookup(&pid);
     if (valp) {
         valp->lat_blk += ts - valp->ts_blk;
+        valp->ts_blk_end = ts;
         // stash the request timestamp for the first submitted request
         if (valp->ts_request == 0)
             valp->ts_request = ts;
@@ -153,39 +174,49 @@ int block_return(struct pt_regs *ctx) {
 }
 
 int split_entry(struct pt_regs *ctx) {
+    u64 ts = bpf_ktime_get_ns();
     u64 pid =  bpf_get_current_pid_tgid();
     struct val_t *valp = map.lookup(&pid);
     if (valp) {
         valp->cnt_split++;
-        valp->ts_split = bpf_ktime_get_ns();
+        valp->ts_split = ts;
+        if (valp->ts_split_start == 0)
+            valp->ts_split_start = ts;
     }
     return 0;
 }
 
 int split_return(struct pt_regs *ctx) {
+    u64 ts = bpf_ktime_get_ns();
     u64 pid =  bpf_get_current_pid_tgid();
     struct val_t *valp = map.lookup(&pid);
     if (valp) {
-        valp->lat_split += bpf_ktime_get_ns() - valp->ts_split;
+        valp->lat_split += ts - valp->ts_split;
+        valp->ts_split_end = ts;
     }
     return 0;
 }
 
 int merge_entry(struct pt_regs *ctx) {
+    u64 ts = bpf_ktime_get_ns();
     u64 pid =  bpf_get_current_pid_tgid();
     struct val_t *valp = map.lookup(&pid);
     if (valp) {
         valp->cnt_merge++;
-        valp->ts_merge = bpf_ktime_get_ns();
+        valp->ts_merge = ts;
+        if (valp->ts_merge_start == 0)
+            valp->ts_merge_start = ts;
     }
     return 0;
 }
 
 int merge_return(struct pt_regs *ctx) {
+    u64 ts = bpf_ktime_get_ns();
     u64 pid =  bpf_get_current_pid_tgid();
     struct val_t *valp = map.lookup(&pid);
     if (valp) {
-        valp->lat_merge += bpf_ktime_get_ns() - valp->ts_merge;
+        valp->lat_merge += ts - valp->ts_merge;
+        valp->ts_merge_end = ts;
     }
     return 0;
 }
@@ -204,9 +235,21 @@ int vfs_read_return(struct pt_regs *ctx) {
         return 0;
     }
 
-    // Calculate delta of each stage
+    // Populate output data struct.
     u64 ts_end = bpf_ktime_get_ns();
     struct data_t data = {0};
+    data.ts_vfs = valp->ts_vfs;
+    data.ts_pgcache = valp->ts_pgcache;
+    data.ts_readpg = valp->ts_readpg;
+    data.ts_ext4readpg = valp->ts_ext4readpg;
+    data.ts_blk_start = valp->ts_blk_start;
+    data.ts_blk_end = valp->ts_blk_end;
+    data.ts_split_start = valp->ts_split_start;
+    data.ts_split_end = valp->ts_split_end;
+    data.ts_merge_start = valp->ts_merge_start;
+    data.ts_merge_end = valp->ts_merge_end;
+    data.ts_request = valp->ts_request;
+
     data.total = ts_end - valp->ts_vfs;
     data.vfs = valp->ts_pgcache - valp->ts_vfs;
     if (valp->ts_readpg > valp->ts_pgcache)
@@ -217,8 +260,8 @@ int vfs_read_return(struct pt_regs *ctx) {
     if (valp->ts_readpg != 0 && valp->ts_ext4readpg > valp->ts_readpg)
         data.readpg = valp->ts_ext4readpg - valp->ts_readpg;
 
-    if (valp->ts_ext4readpg != 0 && valp->ts_blk > valp->ts_ext4readpg)
-        data.ext4readpg = valp->ts_blk_first - valp->ts_ext4readpg;
+    if (valp->ts_ext4readpg != 0 && valp->ts_blk_start > valp->ts_ext4readpg)
+        data.ext4readpg = valp->ts_blk_start - valp->ts_ext4readpg;
 
     if (valp->ts_request != 0)
         data.request = ts_end - valp->ts_request;
