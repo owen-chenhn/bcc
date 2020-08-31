@@ -61,13 +61,13 @@ bpf.attach_kprobe(event="blk_account_io_done", fn_name="rq_done")
 print("Tracing read I/Os. Time threshold: %.1f ms for syscalls and %.1f ms for requests. " % (args.sys_thres, args.rq_thres))
 print("2 types of emit output with the following formats:\n")
 
-print("[SYSCALL] %6s %9s %9s %11s %10s %14s %9s %8s %8s %5s %11s %9s %9s %5s %11s %9s %9s %5s %10s %8s %8s %6s\n" % 
-    ("PID", "TOTAL_LAT", "VFS_LAT", "PGCACHE_LAT", "READPG_LAT", "EXT4READPG_LAT", "BLK_START", 
+print("[SYSCALL] %6s %6s %9s %9s %11s %10s %14s %9s %8s %8s %5s %11s %9s %9s %5s %11s %9s %9s %5s %10s %8s %8s %6s\n" % 
+    ("PID", "SEQ_NUM", "TOTAL_LAT", "VFS_LAT", "PGCACHE_LAT", "READPG_LAT", "EXT4READPG_LAT", "BLK_START", 
     "BLK_LAT", "BLK_END", "COUNT", "SPLIT_START", "SPLIT_LAT", "SPLIT_END", "COUNT", "MERGE_START", 
     "MERGE_LAT", "MERGE_END", "COUNT", "COMMAND", "OFFSET", "SIZE", "FILE"))
 
-print("[REQUEST] %6s %9s %9s %11s %10s %14s %8s %6s\n" % 
-    ("PID", "SEQ_NUM", "CREATE_TS", "QUEUE_LAT", "SERV_LAT", "SECTOR", "LEN", "DISK"))
+print("[REQUEST] %6s %6s %9s %9s %11s %10s %14s %8s %6s\n" % 
+    ("PID", "SEQ_NUM", "TOTAL_LAT", "CREATE_TS", "QUEUE_LAT", "SERV_LAT", "SECTOR", "LEN", "DISK"))
 
 print("Hit Ctrl-C to end and display histograms.\n")
 
@@ -87,8 +87,8 @@ def print_syscall_event(cpu, data, size):
         ts_merge_start = float(event.ts_merge_start - event.ts_vfs) / 1000 if event.ts_merge_start > 0 else 0.
         ts_merge_end = float(event.ts_merge_end - event.ts_vfs) / 1000 if event.ts_merge_end > 0 else 0.
 
-        print("[SYSCALL] %6s %9.3f %9.3f %11.3f %10.3f %14.3f %9.3f %8.3f %8.3f %5s %11.3f %9.3f %9.3f %5s %11.3f %9.3f %9.3f %5s %10s %8s %8s %6s" 
-            % (pid, total, float(event.vfs)/1000, float(event.pgcache)/1000, float(event.readpg)/1000, 
+        print("[SYSCALL] %6s %6s %9.3f %9.3f %11.3f %10.3f %14.3f %9.3f %8.3f %8.3f %5s %11.3f %9.3f %9.3f %5s %11.3f %9.3f %9.3f %5s %10s %8s %8s %6s" 
+            % (pid, event.seq_num, total, float(event.vfs)/1000, float(event.pgcache)/1000, float(event.readpg)/1000, 
             float(event.ext4readpg)/1000, ts_blk_start, float(event.blk)/1000, ts_blk_end, event.cnt_blk, 
             ts_split_start, float(event.split)/1000, ts_split_end, event.cnt_split, ts_merge_start, float(event.merge)/1000, 
             ts_merge_end, event.cnt_merge, event.cmd_name, event.offset, event.size, event.file_name))
@@ -103,8 +103,8 @@ def print_rq_event(cpu, data, size):
     pid = event.pid >> 32
     if total >= (args.rq_thres * 1000):
         ts_create = float(event.ts_rqcreate - event.ts_vfs) / 1000
-        print("[REQUEST] %6s %9s %9.3f %11.3f %10.3f %14s %8s %6s" % 
-            (pid, event.seq_num, ts_create, float(event.queue)/1000, float(event.service)/1000, event.sector, event.len, event.disk_name))
+        print("[REQUEST] %6s %6s %9.3f %9.3f %11.3f %10.3f %14s %8s %6s" % 
+            (pid, event.seq_num, total, ts_create, float(event.queue)/1000, float(event.service)/1000, event.sector, event.len, event.disk_name))
 
 
 # loop with callback to print_event

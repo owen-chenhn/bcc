@@ -14,6 +14,7 @@
 
 /* Value of the bpf map. */
 struct val_t {
+    u64 seq_num;    // Sequence number of a pid
     // Timestamp when entering each section in file-system layer.
     u64 ts_vfs;
     u64 ts_pgcache;
@@ -40,7 +41,7 @@ struct val_t {
     u64 cnt_blk;
     u64 cnt_split;
     u64 cnt_merge;
-    u64 cnt_request;
+    //u64 cnt_request;
     
     s64 offset;    // file offset
     char file_name[DNAME_INLINE_LEN];
@@ -79,6 +80,7 @@ struct data_t {
     
     // File info
     u64 pid;    // PID (upper 32 bits) and Kernel ThreadID (lower 32 bits)
+    u64 seq_num;
     s64 offset;
     u64 size;
     char file_name[DNAME_INLINE_LEN];
@@ -119,7 +121,8 @@ struct rqdata_t {
 };
 
 
-BPF_HASH(map, u64, struct val_t);    // use pid as hash key
+BPF_HASH(seq, u64);    // sequence number of a pid
+BPF_HASH(map, u64, struct val_t);    // Map of syscall data, with pid as key
 BPF_HASH(rqmap, struct request *, struct rqval_t);    // Map of request info for aync request handling
 
 BPF_HISTOGRAM(hist_vfs);
@@ -144,7 +147,12 @@ int vfs_read_entry(struct pt_regs *ctx, struct file *file) {
         return 0;
     
     u64 pid = bpf_get_current_pid_tgid();
+    u64 zero = 0, *seq_num;
+    seq_num = seq.lookup_or_try_init(&pid, &zero);
+    if (!seq_num)
+        return 0;
     struct val_t val = {0};
+    val.seq_num = (*seq_num)++;
     val.ts_vfs = bpf_ktime_get_ns();
     val.offset = file->f_pos;
 
@@ -185,7 +193,6 @@ int block_entry(struct pt_regs *ctx) {
     u64 pid = bpf_get_current_pid_tgid();
     struct val_t *valp = map.lookup(&pid);
     if (valp) {
-        valp->cnt_blk++;
         valp->ts_blk = ts;
         if (valp->ts_blk_start == 0)
             valp->ts_blk_start = ts;
@@ -259,9 +266,10 @@ int rq_create(struct pt_regs *ctx, struct request *rq) {
     u64 pid = bpf_get_current_pid_tgid();
     struct val_t *valp = map.lookup(&pid);
     if (valp) {
+        valp->cnt_blk++;
         struct rqval_t rqval = {0};
         rqval.pid = pid;
-        rqval.seq_num = valp->cnt_request++;
+        rqval.seq_num = valp->seq_num;
         rqval.ts_vfs = valp->ts_vfs;
         rqval.ts_rqcreate = ts;
 
@@ -330,6 +338,8 @@ int vfs_read_return(struct pt_regs *ctx) {
     // Populate output data struct.
     u64 ts_end = bpf_ktime_get_ns();
     struct data_t data = {0};
+    data.pid = pid;
+    data.seq_num = valp->seq_num;
     data.ts_vfs = valp->ts_vfs;
     data.ts_pgcache = valp->ts_pgcache;
     data.ts_readpg = valp->ts_readpg;
@@ -363,8 +373,6 @@ int vfs_read_return(struct pt_regs *ctx) {
     data.cnt_split = valp->cnt_split;
     data.cnt_merge = valp->cnt_merge;
     data.offset = valp->offset;
-    
-    data.pid = pid;
     data.size = size;
     bpf_probe_read_kernel(&data.file_name, sizeof(data.file_name), &valp->file_name);
     bpf_get_current_comm(&data.cmd_name, sizeof(data.cmd_name));
