@@ -40,6 +40,7 @@ struct val_t {
     u64 cnt_blk;
     u64 cnt_split;
     u64 cnt_merge;
+    u64 cnt_request;
     
     s64 offset;    // file offset
     char file_name[DNAME_INLINE_LEN];
@@ -88,6 +89,7 @@ struct data_t {
 /* Value type for request map. It stores info of request struct. */
 struct rqval_t {
     u64 pid;
+    u64 seq_num;
     // Timestamps
     u64 ts_vfs;    // Start time of the VFS syscall that creates this request. 
     u64 ts_rqcreate;
@@ -103,6 +105,7 @@ struct rqval_t {
 /* Output data of async requests. */
 struct rqdata_t {
     u64 pid;        // PID and Kernel ThreadID
+    u64 seq_num;
     u64 ts_vfs;     // Used to calc creation timestamp
     u64 ts_rqcreate;
     u64 queue;      // Queuing latency
@@ -258,6 +261,7 @@ int rq_create(struct pt_regs *ctx, struct request *rq) {
     if (valp) {
         struct rqval_t rqval = {0};
         rqval.pid = pid;
+        rqval.seq_num = valp->cnt_request++;
         rqval.ts_vfs = valp->ts_vfs;
         rqval.ts_rqcreate = ts;
 
@@ -289,6 +293,7 @@ int rq_done(struct pt_regs *ctx, struct request *rq) {
     if (rqvalp) {
         struct rqdata_t rqdata = {0};
         rqdata.pid = rqvalp->pid;
+        rqdata.seq_num = rqvalp->seq_num;
         rqdata.ts_vfs = rqvalp->ts_vfs;
         rqdata.ts_rqcreate = rqvalp->ts_rqcreate;
         rqdata.queue = rqvalp->ts_rqissue - rqvalp->ts_rqcreate;

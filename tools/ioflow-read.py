@@ -41,8 +41,8 @@ bpf.attach_kprobe(event="generic_file_read_iter", fn_name="page_cache_entry")
 bpf.attach_kprobe(event="__do_page_cache_readahead", fn_name="read_page_entry")
 bpf.attach_kprobe(event="ext4_mpage_readpages", fn_name="ext4_read_page_entry")
 # block layer:
-bpf.attach_kprobe(event="generic_make_request", fn_name="block_entry")
-bpf.attach_kretprobe(event="generic_make_request", fn_name="block_return")
+bpf.attach_kprobe(event="submit_bio", fn_name="block_entry")
+bpf.attach_kretprobe(event="submit_bio", fn_name="block_return")
 bpf.attach_kprobe(event="bio_split", fn_name="split_entry")
 bpf.attach_kretprobe(event="bio_split", fn_name="split_return")
 bpf.attach_kprobe(event="bio_attempt_front_merge", fn_name="merge_entry")
@@ -67,7 +67,7 @@ print("[SYSCALL] %6s %9s %9s %11s %10s %14s %9s %8s %8s %5s %11s %9s %9s %5s %11
     "MERGE_LAT", "MERGE_END", "COUNT", "COMMAND", "OFFSET", "SIZE", "FILE"))
 
 print("[REQUEST] %6s %9s %9s %11s %10s %14s %8s %6s\n" % 
-    ("PID", "TOTAL_LAT", "CREATE_TS", "QUEUE_LAT", "SERV_LAT", "SECTOR", "LEN", "DISK"))
+    ("PID", "NUM", "CREATE_TS", "QUEUE_LAT", "SERV_LAT", "SECTOR", "LEN", "DISK"))
 
 print("Hit Ctrl-C to end and display histograms.\n")
 
@@ -104,7 +104,7 @@ def print_rq_event(cpu, data, size):
     if total >= (args.rq_thres * 1000):
         ts_create = float(event.ts_rqcreate - event.ts_vfs) / 1000
         print("[REQUEST] %6s %9.3f %9.3f %11.3f %10.3f %14s %8s %6s" % 
-            (pid, total, ts_create, float(event.queue)/1000, float(event.service)/1000, event.sector, event.len, event.disk_name))
+            (pid, event.seq_num, ts_create, float(event.queue)/1000, float(event.service)/1000, event.sector, event.len, event.disk_name))
 
 
 # loop with callback to print_event
