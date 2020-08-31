@@ -67,7 +67,7 @@ print("[SYSCALL] %6s %9s %9s %11s %10s %14s %9s %8s %8s %5s %11s %9s %9s %5s %11
     "MERGE_LAT", "MERGE_END", "COUNT", "COMMAND", "OFFSET", "SIZE", "FILE"))
 
 print("[REQUEST] %6s %9s %9s %11s %10s %14s %8s %6s\n" % 
-    ("PID", "NUM", "CREATE_TS", "QUEUE_LAT", "SERV_LAT", "SECTOR", "LEN", "DISK"))
+    ("PID", "SEQ_NUM", "CREATE_TS", "QUEUE_LAT", "SERV_LAT", "SECTOR", "LEN", "DISK"))
 
 print("Hit Ctrl-C to end and display histograms.\n")
 
@@ -103,7 +103,7 @@ def print_rq_event(cpu, data, size):
     pid = event.pid >> 32
     if total >= (args.rq_thres * 1000):
         ts_create = float(event.ts_rqcreate - event.ts_vfs) / 1000
-        print("[REQUEST] %6s %9.3f %9.3f %11.3f %10.3f %14s %8s %6s" % 
+        print("[REQUEST] %6s %9s %9.3f %11.3f %10.3f %14s %8s %6s" % 
             (pid, event.seq_num, ts_create, float(event.queue)/1000, float(event.service)/1000, event.sector, event.len, event.disk_name))
 
 
