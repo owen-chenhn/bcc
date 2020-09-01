@@ -14,15 +14,18 @@ import argparse
 
 # parse arguments
 examples = """examples:
-    ./ioflow-syncwrite.py           # Trace sync write io flow. Set default time threshold to 1ms. 
-    ./ioflow-syncwrite.py -t 5      # Trace sync write io flow. Print full data if an IO has total latency that exceeds 5ms. 
+    ./ioflow-syncwrite.py              # Trace sync write io flow. Default time threshold: 1ms for syscalls and 0.2ms for requests.
+    ./ioflow-syncwrite.py -s 5         # Set syscall threshold to 5ms. Print syscall data if its latency exceeds 5 ms.
+    ./ioflow-syncwrite.py -s 5 -r 0.5  # Set syscall threshold to 5ms and request threshold to 0.5 ms.
 """
 parser = argparse.ArgumentParser(
     description="End-to-end IO Flow Tracer for sync write IOs",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-parser.add_argument("-t", "--threshold", type=float, default=1.,
-    help="Set the time threshold in ms. Default to be 1.0ms.")
+parser.add_argument("-s", "--sys_thres", type=float, default=1.,
+    help="Set syscall threshold in ms. Default to be 1.0")
+parser.add_argument("-r", "--rq_thres", type=float, default=0.2,
+    help="Set request threshold in ms. Default to be 0.2")
 args = parser.parse_args()
 
 # load BPF program
@@ -34,8 +37,8 @@ bpf.attach_kprobe(event="ext4_file_write_iter", fn_name="ext4_entry")
 bpf.attach_kprobe(event="generic_perform_write", fn_name="write_page_entry")
 bpf.attach_kprobe(event="ext4_sync_file", fn_name="ext4_sync_entry")
 # block layer:
-bpf.attach_kprobe(event="generic_make_request", fn_name="block_entry")
-bpf.attach_kretprobe(event="generic_make_request", fn_name="block_return")
+bpf.attach_kprobe(event="submit_bio", fn_name="block_entry")
+bpf.attach_kretprobe(event="submit_bio", fn_name="block_return")
 bpf.attach_kprobe(event="bio_split", fn_name="split_entry")
 bpf.attach_kretprobe(event="bio_split", fn_name="split_return")
 bpf.attach_kprobe(event="bio_attempt_front_merge", fn_name="merge_entry")
@@ -43,44 +46,67 @@ bpf.attach_kretprobe(event="bio_attempt_front_merge", fn_name="merge_return")
 bpf.attach_kprobe(event="bio_attempt_back_merge", fn_name="merge_entry")
 bpf.attach_kretprobe(event="bio_attempt_back_merge", fn_name="merge_return")
 bpf.attach_kretprobe(event="vfs_write", fn_name="vfs_write_return")
+# async request handling:
+bpf.attach_kprobe(event="blk_account_io_start", fn_name="rq_create")
+if BPF.get_kprobe_functions(b'blk_start_request'):
+	bpf.attach_kprobe(event="blk_start_request", fn_name="rq_issue")
+bpf.attach_kprobe(event="blk_mq_start_request", fn_name="rq_issue")
+bpf.attach_kprobe(event="blk_account_io_done", fn_name="rq_done")
 
 
 # header
-print("Tracing sync write I/Os... Hit Ctrl-C to end and display histograms.")
-print("IO time threshold: %.1fms." % args.threshold)
-print("Any IO that takes time longer than this value gets emitted here (in us):\n")
+print("Tracing sync write I/Os. Time threshold: %.1f ms for syscalls and %.1f ms for requests. " % (args.sys_thres, args.rq_thres))
+print("2 types of emit output with the following formats:\n")
 
-print("%9s %8s %8s %8s %10s %11s %12s %12s %9s %8s %8s %5s %11s %9s %9s %5s %11s %9s %9s %5s %10s %11s %6s %10s %8s %8s %6s" % (
-    "TOTAL_LAT", "VFS_LAT", "EXT4_TS", "EXT4_LAT", "WRITEPG_TS", "WRITEPG_LAT", "EXT4SYNC_TS", "EXT4SYNC_LAT", 
-    "BLK_START", "BLK_LAT", "BLK_END", "COUNT", "SPLIT_START", "SPLIT_LAT", "SPLIT_END", "COUNT", "MERGE_START", 
-    "MERGE_LAT", "MERGE_END", "COUNT", "REQUEST_TS", "REQUEST_LAT", "PID", "COMMAND", "OFFSET", "SIZE", "FILE"))
+print("[SYSCALL] %6s %6s %9s %9s %9s %11s %12s %9s %8s %8s %5s %11s %9s %9s %5s %11s %9s %9s %5s %10s %8s %8s %6s\n" % 
+    ("PID", "SEQ_NUM", "TOTAL_LAT", "VFS_LAT", "EXT4_LAT", "WRITEPG_LAT", "EXT4SYNC_LAT", "BLK_START", 
+    "BLK_LAT", "BLK_END", "COUNT", "SPLIT_START", "SPLIT_LAT", "SPLIT_END", "COUNT", "MERGE_START", 
+    "MERGE_LAT", "MERGE_END", "COUNT", "COMMAND", "OFFSET", "SIZE", "FILE"))
 
-# process event 
-def print_event(cpu, data, size):
-    event = bpf["events"].event(data)
+print("[REQUEST] %6s %6s %9s %9s %9s %11s %12s %8s %6s\n" % 
+    ("PID", "SEQ_NUM", "TOTAL_LAT", "CREATE_TS", "QUEUE_LAT", "SERV_LAT", "SECTOR", "LEN", "DISK"))
+
+print("Hit Ctrl-C to end and display histograms.\n")
+
+
+# process syscall events
+def print_syscall_event(cpu, data, size):
+    event = bpf["syscall_events"].event(data)
 
     total = float(event.total) / 1000
-    if total >= (args.threshold * 1000):
-        ts_ext4 = float(event.ts_ext4 - event.ts_vfs) / 1000 
-        ts_writepg = float(event.ts_writepg - event.ts_vfs) / 1000
-        ts_ext4sync = float(event.ts_ext4sync - event.ts_vfs) / 1000 if event.ts_ext4sync > 0 else 0.
+    tid = event.pid % (1 << 32)    # kernel thread ID
+    pid = event.pid >> 32
+    if total >= (args.sys_thres * 1000):
         ts_blk_start = float(event.ts_blk_start - event.ts_vfs) / 1000 if event.ts_blk_start > 0 else 0.
         ts_blk_end = float(event.ts_blk_end - event.ts_vfs) / 1000 if event.ts_blk_end > 0 else 0.
         ts_split_start = float(event.ts_split_start - event.ts_vfs) / 1000 if event.ts_split_start > 0 else 0.
         ts_split_end = float(event.ts_split_end - event.ts_vfs) / 1000 if event.ts_split_end > 0 else 0.
         ts_merge_start = float(event.ts_merge_start - event.ts_vfs) / 1000 if event.ts_merge_start > 0 else 0.
         ts_merge_end = float(event.ts_merge_end - event.ts_vfs) / 1000 if event.ts_merge_end > 0 else 0.
-        ts_request = float(event.ts_request - event.ts_vfs) / 1000 if event.ts_request > 0 else 0.
 
-        print("%9.3f %8.3f %8.3f %8.3f %10.3f %11.3f %12.3f %12.3f %9.3f %8.3f %8.3f %5s %11.3f %9.3f %9.3f %5s %11.3f %9.3f %9.3f %5s %10.3f %11.3f %6s %10s %8s %8s %6s" 
-            % (total, float(event.vfs)/1000, ts_ext4, float(event.ext4)/1000, ts_writepg, float(event.writepg)/1000, 
-            ts_ext4sync, float(event.ext4sync)/1000, ts_blk_start, float(event.blk)/1000, ts_blk_end, event.cnt_blk, 
+        print("[SYSCALL] %6s %6s %9.3f %9.3f %9.3f %11.3f %12.3f %9.3f %8.3f %8.3f %5s %11.3f %9.3f %9.3f %5s %11.3f %9.3f %9.3f %5s %10s %8s %8s %6s" 
+            % (pid, event.seq_num, total, float(event.vfs)/1000, float(event.ext4)/1000, float(event.writepg)/1000, 
+            float(event.ext4sync)/1000, ts_blk_start, float(event.blk)/1000, ts_blk_end, event.cnt_blk, 
             ts_split_start, float(event.split)/1000, ts_split_end, event.cnt_split, ts_merge_start, float(event.merge)/1000, 
-            ts_merge_end, event.cnt_merge, ts_request, float(event.request)/1000, event.pid, event.cmd_name, event.offset, 
-            event.size, event.file_name))
+            ts_merge_end, event.cnt_merge, event.cmd_name, event.offset, event.size, event.file_name))
+
+
+# process request events
+def print_rq_event(cpu, data, size):
+    event = bpf["rq_events"].event(data)
+
+    total = float(event.total) / 1000
+    tid = event.pid % (1 << 32)    # kernel thread ID
+    pid = event.pid >> 32
+    if total >= (args.rq_thres * 1000):
+        ts_create = float(event.ts_rqcreate - event.ts_vfs) / 1000
+        print("[REQUEST] %6s %6s %9.3f %9.3f %9.3f %11.3f %12s %8s %6s" % 
+            (pid, event.seq_num, total, ts_create, float(event.queue)/1000, float(event.service)/1000, event.sector, event.len, event.disk_name))
+
 
 # loop with callback to print_event
-bpf["events"].open_perf_buffer(print_event, page_cnt=128)
+bpf["syscall_events"].open_perf_buffer(print_syscall_event, page_cnt=64)
+bpf["rq_events"].open_perf_buffer(print_rq_event, page_cnt=128)
 while 1:
     try:
         bpf.perf_buffer_poll()
@@ -102,5 +128,7 @@ bpf["hist_split"].print_log2_hist("Bio Split (us)")
 print()
 bpf["hist_merge"].print_log2_hist("Bio Merge (us)")
 print()
-bpf["hist_request"].print_log2_hist("Request Handle (us)")
+bpf["hist_rq_queue"].print_log2_hist("Request Queue (us)")
+print()
+bpf["hist_rq_service"].print_log2_hist("Request Service (us)")
 exit()
