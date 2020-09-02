@@ -83,8 +83,8 @@ def print_event(cpu, data, size):
 		event.in_sector, event.in_len, event.out_sector, event.out_len))
 
 # loop with callback to print_event
-bpf["events"].open_perf_buffer(print_event, page_cnt=64)
-while 1:
+bpf["events"].open_perf_buffer(print_event, page_cnt=128)
+while True:
 	try:
 		bpf.perf_buffer_poll()
 	except KeyboardInterrupt:

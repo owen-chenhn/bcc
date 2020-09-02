@@ -113,37 +113,40 @@ int split_return(struct pt_regs *ctx) {
 		return 0; 
 
 	// verify the split event and construct output data struct
-	if (split != NULL) {
-		struct bvec_iter bi_iter;
-		bpf_probe_read_kernel(&bi_iter, sizeof(bi_iter), &split->bi_iter); 
-
-		struct data_t out_data = {
-			.ts  = valp->ts, 
-			.in_sector = valp->sector, 
-			.in_len    = valp->len,
-			.out_sector = bi_iter.bi_sector,
-			.out_len    = bi_iter.bi_size,
-			.type = valp->type,
-			.pid  = pid >> 32
-		};
-
-		// fill remaining fields and emit output data to user space
-		bpf_get_current_comm(&out_data.cmd_name, sizeof(out_data.cmd_name));
-		struct gendisk *disk = split->bi_disk;
-		bpf_probe_read_kernel(&out_data.disk_name, sizeof(out_data.disk_name),
-				disk->disk_name); 
-
-		// obtain r/w flag 
-#ifdef REQ_WRITE
-		out_data.rwflag = !!(split->bi_opf & REQ_WRITE);
-#elif defined(REQ_OP_SHIFT)
-		out_data.rwflag = !!((split->bi_opf >> REQ_OP_SHIFT) == REQ_OP_WRITE);
-#else
-		out_data.rwflag = !!((split->bi_opf & REQ_OP_MASK) == REQ_OP_WRITE);
-#endif
-		events.perf_submit(ctx, &out_data, sizeof(out_data));
+	if (split == NULL) {
+		input.delete(&pid);
+		return 0; 
 	}
 
+	struct bvec_iter bi_iter;
+	bpf_probe_read_kernel(&bi_iter, sizeof(bi_iter), &split->bi_iter); 
+
+	struct data_t out_data = {
+		.ts  = valp->ts, 
+		.in_sector = valp->sector, 
+		.in_len    = valp->len,
+		.out_sector = bi_iter.bi_sector,
+		.out_len    = bi_iter.bi_size,
+		.type = valp->type,
+		.pid  = pid >> 32
+	};
+
+	// fill remaining fields and emit output data to user space
+	bpf_get_current_comm(&out_data.cmd_name, sizeof(out_data.cmd_name));
+	struct gendisk *disk = split->bi_disk;
+	bpf_probe_read_kernel(&out_data.disk_name, sizeof(out_data.disk_name),
+			disk->disk_name); 
+
+	// obtain r/w flag 
+#ifdef REQ_WRITE      // kernel version < 4.8.0
+	out_data.rwflag = split->bi_rw & REQ_WRITE;
+#elif defined(REQ_OP_SHIFT)
+	out_data.rwflag = (split->bi_opf >> REQ_OP_SHIFT) & REQ_OP_WRITE);
+#else
+	out_data.rwflag = (split->bi_opf & REQ_OP_MASK) & REQ_OP_WRITE;
+#endif
+	events.perf_submit(ctx, &out_data, sizeof(out_data));
+	
 	input.delete(&pid);
 	return 0; 
 }
@@ -159,34 +162,37 @@ int merge_return(struct pt_regs *ctx) {
 		return 0;
 
 	// verify the event via return value and construct output data struct
-	if ( PT_REGS_RC(ctx) ) {
-		struct data_t out_data = {
-			.ts  = valp->ts, 
-			.in_sector = valp->sector, 
-			.in_len    = valp->len,
-			.out_sector = req->__sector,
-			.out_len    = req->__data_len,
-			.type = valp->type,
-			.pid  = pid >> 32
-		};
-
-		// fill remaining fields and emit output data to user space
-		bpf_get_current_comm(&out_data.cmd_name, sizeof(out_data.cmd_name));
-		struct gendisk *disk = req->rq_disk; 
-		bpf_probe_read_kernel(&out_data.disk_name, sizeof(out_data.disk_name),
-				disk->disk_name);
-
-		// obtain r/w flag 
-#ifdef REQ_WRITE
-		out_data.rwflag = !!(req->cmd_flags & REQ_WRITE);
-#elif defined(REQ_OP_SHIFT)
-		out_data.rwflag = !!((req->cmd_flags >> REQ_OP_SHIFT) == REQ_OP_WRITE);
-#else
-		out_data.rwflag = !!((req->cmd_flags & REQ_OP_MASK) == REQ_OP_WRITE);
-#endif
-		events.perf_submit(ctx, &out_data, sizeof(out_data));
+	if ( !PT_REGS_RC(ctx) ) {
+		input.delete(&pid); 
+		return 0; 
 	}
 
+	struct data_t out_data = {
+		.ts  = valp->ts, 
+		.in_sector = valp->sector, 
+		.in_len    = valp->len,
+		.out_sector = req->__sector,
+		.out_len    = req->__data_len,
+		.type = valp->type,
+		.pid  = pid >> 32
+	};
+
+	// fill remaining fields and emit output data to user space
+	bpf_get_current_comm(&out_data.cmd_name, sizeof(out_data.cmd_name));
+	struct gendisk *disk = req->rq_disk; 
+	bpf_probe_read_kernel(&out_data.disk_name, sizeof(out_data.disk_name),
+			disk->disk_name);
+
+	// obtain r/w flag 
+#ifdef REQ_WRITE
+	out_data.rwflag = req->cmd_flags & REQ_WRITE;
+#elif defined(REQ_OP_SHIFT)
+	out_data.rwflag = (req->cmd_flags >> REQ_OP_SHIFT) & REQ_OP_WRITE;
+#else
+	out_data.rwflag = (req->cmd_flags & REQ_OP_MASK) & REQ_OP_WRITE;
+#endif
+	events.perf_submit(ctx, &out_data, sizeof(out_data));
+	
 	input.delete(&pid); 
 	return 0; 
 }
