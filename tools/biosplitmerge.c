@@ -23,7 +23,7 @@ struct val_t {
 	u64 ts; 
 	u64 sector;
 	u64 len;
-	u64 type;
+	u8 type;
 };
 
 
@@ -34,9 +34,9 @@ struct data_t {
 	u64 in_len;
 	u64 out_sector; 
 	u64 out_len; 
-	u64 rwflag; 
-	u64 type;
-	u64 pid;
+	u8 rwflag;
+	u8 type;
+	u32 pid;
 	char disk_name[DISK_NAME_LEN];
 	char cmd_name[TASK_COMM_LEN];
 };
@@ -53,12 +53,12 @@ static inline void do_entry(enum type event_type, struct bio *bio) {
 	struct bvec_iter bi_iter;
 	bpf_probe_read_kernel(&bi_iter, sizeof(bi_iter), &bio->bi_iter); 
 
-	struct val_t val = { 
-		.ts     = bpf_ktime_get_ns(), 
-		.sector = bi_iter.bi_sector, 
-		.len    = bi_iter.bi_size,
-		.type   = (u64) event_type
-	}; 
+	struct val_t val = {0};
+	val.ts     = bpf_ktime_get_ns();
+	val.sector = bi_iter.bi_sector;
+	val.len    = bi_iter.bi_size;
+	val.type   = (u8) event_type;
+
 	input.update(&pid, &val);
 }
 
@@ -121,19 +121,22 @@ int split_return(struct pt_regs *ctx) {
 	struct bvec_iter bi_iter;
 	bpf_probe_read_kernel(&bi_iter, sizeof(bi_iter), &split->bi_iter); 
 
-	struct data_t out_data = {
-		.ts  = valp->ts, 
-		.in_sector = valp->sector, 
-		.in_len    = valp->len,
-		.out_sector = bi_iter.bi_sector,
-		.out_len    = bi_iter.bi_size,
-		.type = valp->type,
-		.pid  = pid >> 32
-	};
+	struct data_t out_data = {0};
+	out_data.ts = valp->ts;
+	out_data.in_sector = valp->sector;
+	out_data.in_len    = valp->len;
+	out_data.out_sector = bi_iter.bi_sector;
+	out_data.out_len    = bi_iter.bi_size;
+	out_data.type = valp->type;
+	out_data.pid  = pid >> 32;
 
 	// fill remaining fields and emit output data to user space
 	bpf_get_current_comm(&out_data.cmd_name, sizeof(out_data.cmd_name));
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
 	struct gendisk *disk = split->bi_disk;
+#else
+	struct gendisk *disk = split->bi_bdev->bd_disk;
+#endif
 	bpf_probe_read_kernel(&out_data.disk_name, sizeof(out_data.disk_name),
 			disk->disk_name); 
 
@@ -141,7 +144,7 @@ int split_return(struct pt_regs *ctx) {
 #ifdef REQ_WRITE      // kernel version < 4.8.0
 	out_data.rwflag = split->bi_rw & REQ_WRITE;
 #elif defined(REQ_OP_SHIFT)
-	out_data.rwflag = (split->bi_opf >> REQ_OP_SHIFT) & REQ_OP_WRITE);
+	out_data.rwflag = (split->bi_opf >> REQ_OP_SHIFT) & REQ_OP_WRITE;
 #else
 	out_data.rwflag = (split->bi_opf & REQ_OP_MASK) & REQ_OP_WRITE;
 #endif
@@ -167,15 +170,14 @@ int merge_return(struct pt_regs *ctx) {
 		return 0; 
 	}
 
-	struct data_t out_data = {
-		.ts  = valp->ts, 
-		.in_sector = valp->sector, 
-		.in_len    = valp->len,
-		.out_sector = req->__sector,
-		.out_len    = req->__data_len,
-		.type = valp->type,
-		.pid  = pid >> 32
-	};
+	struct data_t out_data = {0};
+	out_data.ts = valp->ts;
+	out_data.in_sector = valp->sector;
+	out_data.in_len    = valp->len;
+	out_data.out_sector = req->__sector;
+	out_data.out_len    = req->__data_len;
+	out_data.type = valp->type;
+	out_data.pid  = pid >> 32;
 
 	// fill remaining fields and emit output data to user space
 	bpf_get_current_comm(&out_data.cmd_name, sizeof(out_data.cmd_name));

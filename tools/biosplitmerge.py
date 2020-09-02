@@ -78,8 +78,8 @@ def print_event(cpu, data, size):
 	rwflag = 'W' if event.rwflag == 1 else 'R'
 	event_type = type_map[event.type]
 
-	print("%-11.4f %-13s %-14.14s %-6s %-7s %-1s %10s %10s %10s %10s" % (
-		ts, event_type, event.cmd_name, event.pid, event.disk_name, rwflag,  
+	print("%-11.4f %-13s %-14.14s %-6s %-7s %-1d %10s %10s %10s %10s" % (
+		ts, event_type, event.cmd_name, event.pid, event.disk_name, event.rwflag, 
 		event.in_sector, event.in_len, event.out_sector, event.out_len))
 
 # loop with callback to print_event
