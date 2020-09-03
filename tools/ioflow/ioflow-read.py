@@ -71,10 +71,10 @@ print("Tracing read I/Os. Time threshold: %.1f ms for syscalls and %.1f ms for r
 print("2 types of emit output with the following formats:\n")
 
 print("[REQUEST] %6s %6s %9s %9s %11s %10s %14s %8s %6s\n" % 
-    ("PID", "SEQ_NUM", "TOTAL_LAT", "CREATE_TS", "QUEUE_LAT", "SERV_LAT", "SECTOR", "LEN", "DISK"))
+    ("PID", "IO_NUM", "TOTAL_LAT", "CREATE_TS", "QUEUE_LAT", "SERV_LAT", "SECTOR", "LEN", "DISK"))
 
 print("[SYSCALL] %6s %6s %9s %9s %11s %10s %14s %9s %8s %8s %5s %11s %9s %9s %5s %11s %9s %9s %5s %10s %8s %8s %6s\n" % 
-    ("PID", "SEQ_NUM", "TOTAL_LAT", "VFS_LAT", "PGCACHE_LAT", "READPG_LAT", "EXT4READPG_LAT", "BLK_START", 
+    ("PID", "IO_NUM", "TOTAL_LAT", "VFS_LAT", "PGCACHE_LAT", "READPG_LAT", "EXT4READPG_LAT", "BLK_START", 
     "BLK_LAT", "BLK_END", "COUNT", "SPLIT_START", "SPLIT_LAT", "SPLIT_END", "COUNT", "MERGE_START", 
     "MERGE_LAT", "MERGE_END", "COUNT", "COMMAND", "OFFSET", "SIZE", "FILE"))
 

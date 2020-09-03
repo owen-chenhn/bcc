@@ -12,7 +12,9 @@
 
 /* Value of the bpf map. */
 struct val_t {
+    // Identify an syscall IO. All the requests that created by an IO have the same seq_num.
     u32 seq_num;
+
     // Timestamp of file-system sections.
     u64 ts_vfs;
 # ifdef IO_FLOW_READ
@@ -128,9 +130,10 @@ struct rqdata_t {
 
 
 /* Common helper functions used by read and write tracers */
-static inline void comm_vfs_entry(struct val_t *val, u32 seq_num, struct file *file) {
+static inline void comm_vfs_entry(struct val_t *val, struct file *file) {
     val->ts_vfs = bpf_ktime_get_ns();
-    val->seq_num = seq_num;
+    // Use a random number to identify this IO and tie all the requests it creates.
+    val->seq_num = bpf_get_prandom_u32() % 1000000;
     val->offset = file->f_pos;
 
     struct dentry *de = file->f_path.dentry;

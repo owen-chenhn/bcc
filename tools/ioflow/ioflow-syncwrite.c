@@ -16,7 +16,6 @@
 // Use python string replacement to import common header code
 [IMPORT_COMM]
 
-BPF_HASH(seq, u64);    // sequence number of a pid
 BPF_HASH(map, u64, struct val_t);    // Map of syscall data, with pid as key
 BPF_HASH(rqmap, struct request *, struct rqval_t);    // Map of request info for aync request handling
 
@@ -40,13 +39,8 @@ int vfs_write_entry(struct pt_regs *ctx, struct file *file) {
         return 0;
     
     u64 pid =  bpf_get_current_pid_tgid();
-    u64 zero = 0, *seq_num;
-    seq_num = seq.lookup_or_try_init(&pid, &zero);
-    if (!seq_num)
-        return 0;
-
     struct val_t val = {0};
-    comm_vfs_entry(&val, (*seq_num)++, file);
+    comm_vfs_entry(&val, file);
     map.update(&pid, &val);
     return 0;
 }
