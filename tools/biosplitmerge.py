@@ -55,9 +55,9 @@ if args.merge or not args.split:
 
 
 # header
-print("%-11s %-13s %-14s %-6s %-7s %-1s %10s %10s %10s %10s" % (
-	"TIME(s)", "EVENT", "COMMAND", "PID", "DISK", "T", "IN-SECTOR", 
-	"IN-BYTES", "OUT-SECTOR", "OUT-BYTES"))
+print("%-11s %-13s %-14s %-6s %-7s %-1s %10s %10s %11s %11s %11s %11s" % (
+	"TIME(s)", "EVENT", "COMMAND", "PID", "DISK", "T", "IN-SECTOR", "IN-BYTES", 
+	"OUT-SECTOR1", "OUT-BYTES1", "OUT-SECTOR2", "OUT-BYTES2"))
 
 start_ts = 0
 type_map = {
@@ -78,9 +78,14 @@ def print_event(cpu, data, size):
 	rwflag = 'W' if event.rwflag == 1 else 'R'
 	event_type = type_map[event.type]
 
-	print("%-11.4f %-13s %-14.14s %-6s %-7s %-1d %10s %10s %10s %10s" % (
-		ts, event_type, event.cmd_name, event.pid, event.disk_name, event.rwflag, 
-		event.in_sector, event.in_len, event.out_sector, event.out_len))
+	print("%-11.4f %-13s %-14.14s %-6s %-7s %-1s %10s %10s %11s %11s " % (
+		ts, event_type, event.cmd_name, event.pid, event.disk_name, rwflag, 
+		event.in_sector, event.in_len, event.out_sector1, event.out_len1), end='')
+	if event.type == 0:
+		print("%11s %11s" % (event.out_sector2, event.out_len2))
+	else:
+		print()
+
 
 # loop with callback to print_event
 bpf["events"].open_perf_buffer(print_event, page_cnt=128)
