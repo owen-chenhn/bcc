@@ -12,7 +12,7 @@
 
 /* Value of the bpf map. */
 struct val_t {
-    u64 seq_num;
+    u32 seq_num;
     // Timestamp of file-system sections.
     u64 ts_vfs;
 # ifdef IO_FLOW_READ
@@ -42,9 +42,9 @@ struct val_t {
     u64 split;
     u64 merge;
 
-    u64 cnt_blk;
-    u64 cnt_split;
-    u64 cnt_merge;
+    u32 cnt_blk;
+    u32 cnt_split;
+    u32 cnt_merge;
     
     // File info
     s64 offset;
@@ -54,8 +54,8 @@ struct val_t {
 
 /* Output data of syscall IO, sent from kernel to user space. */
 struct data_t {
-    u64 pid;
-    u64 seq_num;
+    u32 pid;
+    u32 seq_num;
     // Latency in each stage
     u64 vfs;
 # ifdef IO_FLOW_READ
@@ -84,13 +84,13 @@ struct data_t {
     u64 ts_merge_start;
     u64 ts_merge_end;
 
-    u64 cnt_blk;
-    u64 cnt_split;
-    u64 cnt_merge;
+    u32 cnt_blk;
+    u32 cnt_split;
+    u32 cnt_merge;
 
     // File info
     s64 offset;
-    u64 size;
+    s32 size;
     char file_name[DNAME_INLINE_LEN];
     char cmd_name[TASK_COMM_LEN];
 };
@@ -98,8 +98,8 @@ struct data_t {
 
 /* Value type for request map. It stores info of request struct. */
 struct rqval_t {
-    u64 pid;
-    u64 seq_num;
+    u32 pid;
+    u32 seq_num;
     // Timestamps
     u64 ts_vfs;    // Start time of the VFS syscall that creates this request. 
     u64 ts_rqcreate;
@@ -107,28 +107,28 @@ struct rqval_t {
 
     // IO info
     u64 sector;
-    u64 len;
+    u32 len;
     char disk_name[DISK_NAME_LEN];
 };
 
 
 /* Output data of async requests. */
 struct rqdata_t {
-    u64 pid;
-    u64 seq_num;
+    u32 pid;
+    u32 seq_num;
     u64 ts_create;  // Create time (from the start of vfs call)
     u64 queue;      // Queuing latency
     u64 service;    // Handle lantency by device driver
 
     // IO info
     u64 sector;
-    u64 len;
+    u32 len;
     char disk_name[DISK_NAME_LEN];
 };
 
 
 /* Common helper functions used by read and write tracers */
-static inline void comm_vfs_entry(struct val_t *val, u64 seq_num, struct file *file) {
+static inline void comm_vfs_entry(struct val_t *val, u32 seq_num, struct file *file) {
     val->ts_vfs = bpf_ktime_get_ns();
     val->seq_num = seq_num;
     val->offset = file->f_pos;
@@ -173,7 +173,7 @@ static inline void comm_merge_return(struct val_t *val, u64 ts) {
 }
 
 static inline void comm_rq_create(struct rqval_t *rqval, struct val_t *val, 
-                                  struct request *rq, u64 pid, u64 ts) {
+                                  struct request *rq, u32 pid, u64 ts) {
     val->cnt_blk++;
     
     rqval->pid = pid;
@@ -205,7 +205,7 @@ static inline void comm_rq_done(struct rqdata_t *rqdata, struct rqval_t *rqval, 
         &rqval->disk_name);
 }
 
-static inline void comm_vfs_return(struct data_t *data,  struct val_t *val, u64 pid, 
+static inline void comm_vfs_return(struct data_t *data,  struct val_t *val, u32 pid, 
                                    u64 ts, ssize_t size) {
     data->pid = pid;
     data->seq_num = val->seq_num;
