@@ -101,7 +101,7 @@ def print_rq_event(cpu, data, size):
     event = bpf["rq_events"].event(data)
     total = float(event.queue + event.service) / 1000
     if total >= (args.rq_thres * 1000):
-        print("[REQUEST] %6s %6s %9.3f %9.3f %11.3f %10.3f %14s %8s %6s" % 
+        print("[REQUEST] %6s %6s %9.3f %9.3f %9.3f %11.3f %12s %8s %6s" % 
             (event.pid, event.seq_num, total, float(event.ts_create)/1000, float(event.queue)/1000, 
             float(event.service)/1000, event.sector, event.len, event.disk_name))
 

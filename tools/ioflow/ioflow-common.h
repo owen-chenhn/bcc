@@ -197,8 +197,15 @@ static inline void comm_rq_done(struct rqdata_t *rqdata, struct rqval_t *rqval, 
     rqdata->pid = rqval->pid;
     rqdata->seq_num = rqval->seq_num;
     rqdata->ts_create = rqval->ts_rqcreate - rqval->ts_vfs;
-    rqdata->queue = rqval->ts_rqissue - rqval->ts_rqcreate;
-    rqdata->service = ts - rqval->ts_rqissue;
+    if (rqval->ts_rqissue) {
+        rqdata->queue = rqval->ts_rqissue - rqval->ts_rqcreate;
+        rqdata->service = ts - rqval->ts_rqissue;
+    }
+    else {
+        rqdata->queue = 0;
+        rqdata->service = ts - rqval->ts_rqcreate;
+    }
+    
     rqdata->sector = rqval->sector;
     rqdata->len = rqval->len;
     bpf_probe_read_kernel(&rqdata->disk_name, sizeof(rqdata->disk_name), 
