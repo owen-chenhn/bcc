@@ -1,10 +1,6 @@
 #!/usr/bin/python
 # 
 # ioflow-read.py        End-to-end IO Flow Tracer for read() syscall. 
-# 
-# Usage: 
-#    ./ioflow-read.py           # Default time threshold: 1ms for syscalls and 0.2ms for requests. 
-#    ./ioflow-read.py -t 5      # Print data if syscall latency exceeds 5ms or request latency exceeds 0.2ms.
 #
 #
 # Copyright (c) Google LLC
