@@ -17,15 +17,16 @@ examples = """examples:
     ./ioflow-syncwrite.py              # Trace sync write io flow. Default time threshold: 1ms for syscalls and 0.2ms for requests.
     ./ioflow-syncwrite.py -s 5         # Set syscall threshold to 5ms. Print syscall data if its latency exceeds 5 ms.
     ./ioflow-syncwrite.py -s 5 -r 0.5  # Set syscall threshold to 5ms and request threshold to 0.5 ms.
+    Any syscall data and request data that takes time longer than the corresponding threshold is emitted. 
 """
 parser = argparse.ArgumentParser(
     description="End-to-end IO Flow Tracer for sync write IOs",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
 parser.add_argument("-s", "--sys_thres", type=float, default=1.,
-    help="Set syscall threshold in ms. Default to be 1.0")
+    help="Set syscall threshold in ms. Emit any syscall data that takes time longer than this threshold. Default to be 1.0")
 parser.add_argument("-r", "--rq_thres", type=float, default=0.2,
-    help="Set request threshold in ms. Default to be 0.2")
+    help="Set request threshold in ms. Emit any request data that takes time longer than this threshold. Default to be 0.2")
 args = parser.parse_args()
 
 
