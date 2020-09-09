@@ -64,8 +64,8 @@ bpf.attach_kretprobe(event="vfs_write", fn_name="vfs_write_return")
 
 
 # header
-print("Tracing sync write I/Os. Time threshold: %.1f ms for syscalls and %.1f ms for requests. " % (args.sys_thres, args.rq_thres))
-print("2 types of emit output with the following formats:\n")
+print("Tracing sync write I/Os. Time threshold: %.1f ms for syscalls and %.1f ms for requests. Emit data that takes time longer than its threshold." % (args.sys_thres, args.rq_thres))
+print("2 types of emit output with the following formats (unit: us):\n")
 
 print("[REQUEST] %6s %6s %9s %9s %9s %11s %12s %8s %6s\n" % 
     ("PID", "IO_NUM", "TOTAL_LAT", "CREATE_TS", "QUEUE_LAT", "SERV_LAT", "SECTOR", "LEN", "DISK"))

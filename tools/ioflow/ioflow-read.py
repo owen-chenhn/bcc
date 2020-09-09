@@ -64,8 +64,8 @@ bpf.attach_kretprobe(event="vfs_read", fn_name="vfs_read_return")
 
 
 # header
-print("Tracing read I/Os. Time threshold: %.1f ms for syscalls and %.1f ms for requests. " % (args.sys_thres, args.rq_thres))
-print("2 types of emit output with the following formats:\n")
+print("Tracing read I/Os. Time threshold: %.1f ms for syscalls and %.1f ms for requests. Emit data that takes time longer than its threshold." % (args.sys_thres, args.rq_thres))
+print("2 types of emit output with the following formats: (unit: us)\n")
 
 print("[REQUEST] %6s %6s %9s %9s %11s %10s %14s %8s %6s\n" % 
     ("PID", "IO_NUM", "TOTAL_LAT", "CREATE_TS", "QUEUE_LAT", "SERV_LAT", "SECTOR", "LEN", "DISK"))
