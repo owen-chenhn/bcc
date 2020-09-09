@@ -16,8 +16,8 @@
 // Use python string replacement to import common header code
 [IMPORT_COMM]
 
-BPF_HASH(map, u64, struct val_t);    // Map of syscall data, with pid as key
-BPF_HASH(rqmap, struct request *, struct rqval_t);    // Map of request info for aync request handling
+BPF_HASH(syscall_map, u64, struct val_t);    // Map of syscall data, with pid as key
+BPF_HASH(request_map, struct request *, struct rqval_t);    // Map of request info for asynchronous request handling
 
 BPF_HISTOGRAM(hist_vfs);
 BPF_HISTOGRAM(hist_ext4);
@@ -41,13 +41,13 @@ int vfs_write_entry(struct pt_regs *ctx, struct file *file) {
     u64 pid =  bpf_get_current_pid_tgid();
     struct val_t val = {0};
     comm_vfs_entry(&val, file);
-    map.update(&pid, &val);
+    syscall_map.update(&pid, &val);
     return 0;
 }
 
 int ext4_entry(struct pt_regs *ctx) {
     u64 pid =  bpf_get_current_pid_tgid();
-    struct val_t *valp = map.lookup(&pid);
+    struct val_t *valp = syscall_map.lookup(&pid);
     if (valp && valp->ts_ext4 == 0)
         valp->ts_ext4 = bpf_ktime_get_ns();
     return 0;
@@ -55,7 +55,7 @@ int ext4_entry(struct pt_regs *ctx) {
 
 int write_page_entry(struct pt_regs *ctx) {
     u64 pid =  bpf_get_current_pid_tgid();
-    struct val_t *valp = map.lookup(&pid);
+    struct val_t *valp = syscall_map.lookup(&pid);
     if (valp && valp->ts_writepg == 0)
         valp->ts_writepg = bpf_ktime_get_ns();
     return 0;
@@ -63,7 +63,7 @@ int write_page_entry(struct pt_regs *ctx) {
 
 int ext4_sync_entry(struct pt_regs *ctx) {
     u64 pid =  bpf_get_current_pid_tgid();
-    struct val_t *valp = map.lookup(&pid);
+    struct val_t *valp = syscall_map.lookup(&pid);
     if (valp && valp->ts_ext4sync == 0)
         valp->ts_ext4sync = bpf_ktime_get_ns();
     return 0;
@@ -73,7 +73,7 @@ int ext4_sync_entry(struct pt_regs *ctx) {
 int block_entry(struct pt_regs *ctx) {
     u64 ts = bpf_ktime_get_ns();
     u64 pid = bpf_get_current_pid_tgid();
-    struct val_t *valp = map.lookup(&pid);
+    struct val_t *valp = syscall_map.lookup(&pid);
     if (valp) {
         comm_block_entry(valp, ts);
     }
@@ -83,7 +83,7 @@ int block_entry(struct pt_regs *ctx) {
 int block_return(struct pt_regs *ctx) {
     u64 ts = bpf_ktime_get_ns();
     u64 pid = bpf_get_current_pid_tgid();
-    struct val_t *valp = map.lookup(&pid);
+    struct val_t *valp = syscall_map.lookup(&pid);
     if (valp) {
         comm_block_return(valp, ts);
     }
@@ -93,7 +93,7 @@ int block_return(struct pt_regs *ctx) {
 int split_entry(struct pt_regs *ctx) {
     u64 ts = bpf_ktime_get_ns();
     u64 pid = bpf_get_current_pid_tgid();
-    struct val_t *valp = map.lookup(&pid);
+    struct val_t *valp = syscall_map.lookup(&pid);
     if (valp) {
         comm_split_entry(valp, ts);
     }
@@ -103,7 +103,7 @@ int split_entry(struct pt_regs *ctx) {
 int split_return(struct pt_regs *ctx) {
     u64 ts = bpf_ktime_get_ns();
     u64 pid = bpf_get_current_pid_tgid();
-    struct val_t *valp = map.lookup(&pid);
+    struct val_t *valp = syscall_map.lookup(&pid);
     if (valp) {
         comm_split_return(valp, ts);
     }
@@ -113,7 +113,7 @@ int split_return(struct pt_regs *ctx) {
 int merge_entry(struct pt_regs *ctx) {
     u64 ts = bpf_ktime_get_ns();
     u64 pid = bpf_get_current_pid_tgid();
-    struct val_t *valp = map.lookup(&pid);
+    struct val_t *valp = syscall_map.lookup(&pid);
     if (valp) {
         comm_merge_entry(valp, ts);
     }
@@ -123,7 +123,7 @@ int merge_entry(struct pt_regs *ctx) {
 int merge_return(struct pt_regs *ctx) {
     u64 ts = bpf_ktime_get_ns();
     u64 pid = bpf_get_current_pid_tgid();
-    struct val_t *valp = map.lookup(&pid);
+    struct val_t *valp = syscall_map.lookup(&pid);
     if (valp) {
         comm_merge_return(valp, ts);
     }
@@ -135,11 +135,11 @@ int rq_create(struct pt_regs *ctx, struct request *rq) {
     // Still in the syscall process's context now. 
     u64 ts = bpf_ktime_get_ns();
     u64 pid = bpf_get_current_pid_tgid();
-    struct val_t *valp = map.lookup(&pid);
+    struct val_t *valp = syscall_map.lookup(&pid);
     if (valp) {
         struct rqval_t rqval = {0};
         comm_rq_create(&rqval, valp, rq, pid >> 32, ts);
-        rqmap.insert(&rq, &rqval);
+        request_map.insert(&rq, &rqval);
     }
     return 0;
 }
@@ -148,7 +148,7 @@ int rq_create(struct pt_regs *ctx, struct request *rq) {
 int rq_issue(struct pt_regs *ctx, struct request *rq) {
     // Async to the syscall process now. 
     u64 ts = bpf_ktime_get_ns();
-    struct rqval_t *rqvalp = rqmap.lookup(&rq);
+    struct rqval_t *rqvalp = request_map.lookup(&rq);
     comm_rq_issue(rqvalp, ts);
     return 0;
 }
@@ -156,7 +156,7 @@ int rq_issue(struct pt_regs *ctx, struct request *rq) {
 // The request is done.
 int rq_done(struct pt_regs *ctx, struct request *rq) {
     u64 ts = bpf_ktime_get_ns();
-    struct rqval_t *rqvalp = rqmap.lookup(&rq);
+    struct rqval_t *rqvalp = request_map.lookup(&rq);
     if (rqvalp) {
         struct rqdata_t rqdata = {0};
         comm_rq_done(&rqdata, rqvalp, ts);
@@ -165,7 +165,7 @@ int rq_done(struct pt_regs *ctx, struct request *rq) {
         hist_rq_queue.increment(bpf_log2l(rqdata.queue / 1000));
         hist_rq_service.increment(bpf_log2l(rqdata.service / 1000));
         
-        rqmap.delete(&rq);
+        request_map.delete(&rq);
     }
     return 0;
 }
@@ -176,12 +176,12 @@ int vfs_write_return(struct pt_regs *ctx) {
     ssize_t size = (ssize_t) PT_REGS_RC(ctx);
     u64 pid =  bpf_get_current_pid_tgid();
 
-    struct val_t *valp = map.lookup(&pid);
+    struct val_t *valp = syscall_map.lookup(&pid);
     if (!valp) 
         return 0;
     if (!valp->ts_ext4 || !valp->ts_writepg) {
         // filter out non-buffered wirtes
-        map.delete(&pid);
+        syscall_map.delete(&pid);
         return 0;
     }
 
@@ -207,7 +207,7 @@ int vfs_write_return(struct pt_regs *ctx) {
         data.ext4sync = ts_end - valp->ts_ext4sync;
 
     syscall_events.perf_submit(ctx, &data, sizeof(data));
-    map.delete(&pid);
+    syscall_map.delete(&pid);
 
     // update histograms
     if (data.vfs)
