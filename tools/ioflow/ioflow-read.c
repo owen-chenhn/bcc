@@ -57,7 +57,7 @@ int page_cache_entry(struct pt_regs *ctx) {
 int read_page_entry(struct pt_regs *ctx) {
     u64 pid = bpf_get_current_pid_tgid();
     struct val_t *valp = map.lookup(&pid);
-    if (valp && valp->ts_readpg <= valp->ts_pgcache)
+    if (valp && valp->ts_readpg  == 0)
         valp->ts_readpg = bpf_ktime_get_ns();
     return 0;
 }
@@ -65,7 +65,7 @@ int read_page_entry(struct pt_regs *ctx) {
 int ext4_read_page_entry(struct pt_regs *ctx) {
     u64 pid = bpf_get_current_pid_tgid();
     struct val_t *valp = map.lookup(&pid);
-    if (valp && valp->ts_ext4readpg <= valp->ts_readpg)
+    if (valp && valp->ts_ext4readpg  == 0)
         valp->ts_ext4readpg = bpf_ktime_get_ns();
     return 0;
 }

@@ -56,7 +56,7 @@ int ext4_entry(struct pt_regs *ctx) {
 int write_page_entry(struct pt_regs *ctx) {
     u64 pid =  bpf_get_current_pid_tgid();
     struct val_t *valp = map.lookup(&pid);
-    if (valp && valp->ts_writepg <= valp->ts_ext4)
+    if (valp && valp->ts_writepg == 0)
         valp->ts_writepg = bpf_ktime_get_ns();
     return 0;
 }
@@ -64,7 +64,7 @@ int write_page_entry(struct pt_regs *ctx) {
 int ext4_sync_entry(struct pt_regs *ctx) {
     u64 pid =  bpf_get_current_pid_tgid();
     struct val_t *valp = map.lookup(&pid);
-    if (valp && valp->ts_ext4sync <= valp->ts_writepg)
+    if (valp && valp->ts_ext4sync == 0)
         valp->ts_ext4sync = bpf_ktime_get_ns();
     return 0;
 }
