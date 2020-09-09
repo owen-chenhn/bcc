@@ -35,7 +35,7 @@ BPF_PERF_OUTPUT(rq_events);
 
 int vfs_write_entry(struct pt_regs *ctx, struct file *file) {
     // Filter asyc and direct IO
-    if (!(file->f_op->write_iter) || file->f_flags & O_DIRECT)
+    if (!(file->f_op->write_iter))
         return 0;
     
     u64 pid =  bpf_get_current_pid_tgid();
@@ -195,7 +195,12 @@ int vfs_write_return(struct pt_regs *ctx) {
     comm_vfs_return(&data, valp, pid >> 32, ts_end, size);
     
     data.vfs = valp->ts_ext4 - valp->ts_vfs;
-    data.ext4 = valp->ts_writepg - valp->ts_ext4;
+    if (valp->ts_writepg > valp->ts_ext4)
+        data.ext4 = valp->ts_writepg - valp->ts_ext4;
+    else 
+        // Direct IO
+        data.ext4 = valp->ts_blk_start - valp->ts_ext4;
+    
     if (valp->ts_ext4sync > valp->ts_writepg)
         data.writepg = valp->ts_ext4sync - valp->ts_writepg;
     else

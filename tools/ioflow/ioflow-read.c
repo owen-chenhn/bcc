@@ -36,7 +36,7 @@ BPF_PERF_OUTPUT(rq_events);
 
 int vfs_read_entry(struct pt_regs *ctx, struct file *file) {
     // Filter asyc and direct IO
-    if (!(file->f_op->read_iter) || file->f_flags & O_DIRECT)
+    if (!(file->f_op->read_iter))
         return 0;
     
     u64 pid = bpf_get_current_pid_tgid();
@@ -190,9 +190,16 @@ int vfs_read_return(struct pt_regs *ctx) {
     struct data_t data = {0};
     comm_vfs_return(&data, valp, pid >> 32, ts_end, size);
 
-    data.vfs = valp->ts_pgcache - valp->ts_vfs;
+    if (valp->ts_pgcache > valp->ts_vfs) 
+        data.vfs = valp->ts_pgcache - valp->ts_vfs;
+    else 
+        // Direct IO. Directly falls to block layer. 
+        data.vfs = data.ts_blk_start - valp->ts_vfs;
+    
     if (valp->ts_readpg > valp->ts_pgcache)
         data.pgcache = valp->ts_readpg - valp->ts_pgcache;
+    else if (data.ts_blk_start > valp->ts_pgcache)
+        data.pgcache = data.ts_blk_start - valp->ts_pgcache;
     else 
         data.pgcache = ts_end - valp->ts_pgcache;
 
