@@ -57,7 +57,7 @@ if args.merge or not args.split:
 # header
 print("%-11s %-13s %-14s %-6s %-7s %-1s %10s %10s %11s %11s %11s %11s" % (
 	"TIME(s)", "EVENT", "COMMAND", "PID", "DISK", "T", "IN-SECTOR", "IN-BYTES", 
-	"OUT-SECTOR1", "OUT-BYTES1", "OUT-SECTOR2", "OUT-BYTES2"))
+	"OUT-SECTOR", "OUT-BYTES", "REM-SECTOR", "REM-BYTES"))
 
 start_ts = 0
 type_map = {
@@ -80,9 +80,9 @@ def print_event(cpu, data, size):
 
 	print("%-11.4f %-13s %-14.14s %-6s %-7s %-1s %10s %10s %11s %11s " % (
 		ts, event_type, event.cmd_name, event.pid, event.disk_name, rwflag, 
-		event.in_sector, event.in_len, event.out_sector1, event.out_len1), end='')
+		event.in_sector, event.in_len, event.out_sector, event.out_len), end='')
 	if event.type == 0:
-		print("%11s %11s" % (event.out_sector2, event.out_len2))
+		print("%11s %11s" % (event.rem_sector, event.rem_len))
 	else:
 		print()
 

@@ -12,8 +12,9 @@ Usage:
 # ./biosplitmerge.py -M    Trace merge events only.
 
 Sample output:
+./biosplitmerge.py
 ^C
-TIME(s)     EVENT         COMMAND        PID    DISK    T  IN-SECTOR   IN-BYTES OUT-SECTOR1  OUT-BYTES1 OUT-SECTOR2  OUT-BYTES2
+TIME(s)     EVENT         COMMAND        PID    DISK    T  IN-SECTOR   IN-BYTES  OUT-SECTOR   OUT-BYTES  REM-SECTOR   REM-BYTES
 0.0000      Split         fio            2514   sdc     W   47431680    2097152    47431680      131072    47431936     1966080
 0.0001      Split         fio            2514   sdc     W   47431936    1966080    47431936      131072    47432192     1835008
 0.0001      Split         fio            2514   sdc     W   47432192    1835008    47432192      131072    47432448     1703936
@@ -49,7 +50,7 @@ The output contains the split/merge event information about:
 "T": read/write io type. 
 "IN-SECTOR": disk sector number of the input bio (the bio that gets split/merged).
 "IN-BYTES": io size of the input bio.
-"OUT-SECTOR1": disk sector number of the output bio. For split, it refers to the new bio; For merge, it refers to the request struct that input bio is merged into.
-"OUT-BYTES1": io size of the output. Split: io size of the new bio; Merge: size of the output request struct. 
-"OUT-SECTOR2": sector number of the remaining bio for split events. It has no meaning for merge events.
-"OUT-BYTES1": io size of the remaining bio (for split events). 
+"OUT-SECTOR": disk sector number of the output bio. For split, it refers to the new bio; For merge, it refers to the request struct that input bio is merged into.
+"OUT-BYTES": io size of the output. Split: io size of the new bio; Merge: size of the output request struct. 
+"REM-SECTOR": sector number of the remaining bio for split events. It has no meaning for merge events.
+"REM-BYTES": io size of the remaining bio (for split events). 

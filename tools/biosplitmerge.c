@@ -32,10 +32,10 @@ struct data_t {
 	u64 ts; 
 	u64 in_sector;
 	u64 in_len;
-	u64 out_sector1; 
-	u64 out_len1;
-	u64 out_sector2;    // The remaining bio for split
-	u64 out_len2; 
+	u64 out_sector; 
+	u64 out_len;
+	u64 rem_sector;    // The remaining bio for split
+	u64 rem_len;
 	u8 rwflag;
 	u8 type;
 	u32 pid;
@@ -127,10 +127,10 @@ int split_return(struct pt_regs *ctx) {
 	out_data.ts = valp->ts;
 	out_data.in_sector = valp->sector;
 	out_data.in_len    = valp->len;
-	out_data.out_sector1 = bi_iter.bi_sector;
-	out_data.out_len1    = bi_iter.bi_size;
-	out_data.out_sector2 = out_data.in_sector + (bi_iter.bi_size >> 9);
-	out_data.out_len2    = out_data.in_len - bi_iter.bi_size;
+	out_data.out_sector = bi_iter.bi_sector;
+	out_data.out_len    = bi_iter.bi_size;
+	out_data.rem_sector = out_data.in_sector + (bi_iter.bi_size >> 9);
+	out_data.rem_len    = out_data.in_len - bi_iter.bi_size;
 	out_data.type = valp->type;
 	out_data.pid  = pid >> 32;
 
@@ -178,8 +178,8 @@ int merge_return(struct pt_regs *ctx) {
 	out_data.ts = valp->ts;
 	out_data.in_sector = valp->sector;
 	out_data.in_len    = valp->len;
-	out_data.out_sector1 = req->__sector;
-	out_data.out_len1    = req->__data_len;
+	out_data.out_sector = req->__sector;
+	out_data.out_len    = req->__data_len;
 	out_data.type = valp->type;
 	out_data.pid  = pid >> 32;
 
