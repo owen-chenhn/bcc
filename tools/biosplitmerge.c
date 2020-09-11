@@ -191,11 +191,11 @@ int merge_return(struct pt_regs *ctx) {
 
 	// obtain r/w flag 
 #ifdef REQ_WRITE
-	out_data.rwflag = req->cmd_flags & REQ_WRITE;
+	out_data.rwflag = req->cmd_flags == REQ_WRITE;
 #elif defined(REQ_OP_SHIFT)
-	out_data.rwflag = (req->cmd_flags >> REQ_OP_SHIFT) & REQ_OP_WRITE;
+	out_data.rwflag = (req->cmd_flags >> REQ_OP_SHIFT) == REQ_OP_WRITE;
 #else
-	out_data.rwflag = (req->cmd_flags & REQ_OP_MASK) & REQ_OP_WRITE;
+	out_data.rwflag = (req->cmd_flags & REQ_OP_MASK) == REQ_OP_WRITE;
 #endif
 	events.perf_submit(ctx, &out_data, sizeof(out_data));
 	
