@@ -36,8 +36,10 @@ with open("ioflow-read.c") as src_f:
 with open("ioflow-common.h") as comm_f:
     comm_text = comm_f.read()
 
+sys_thres_flag = "-DSYSCALL_THRESHOLD=%d" % int(args.sys_thres * 1000000)
+rq_thres_flag = "-DREQUEST_THRESHOLD=%d" % int(args.rq_thres * 1000000)
 # load BPF program
-bpf = BPF(text=bpf_text.replace("[IMPORT_COMM]", comm_text, 1))
+bpf = BPF(text=bpf_text.replace("[IMPORT_COMM]", comm_text, 1), cflags=[sys_thres_flag, rq_thres_flag])
 
 # file system layer:
 bpf.attach_kprobe(event="vfs_read", fn_name="vfs_read_entry")
@@ -81,30 +83,27 @@ print("Hit Ctrl-C to end and display histograms.\n")
 # process syscall events
 def print_syscall_event(cpu, data, size):
     event = bpf["syscall_events"].event(data)
-    total = float(event.total) / 1000
-    if total >= (args.sys_thres * 1000):
-        ts_blk_start = float(event.ts_blk_start - event.ts_vfs) / 1000 if event.ts_blk_start > 0 else 0.
-        ts_blk_end = float(event.ts_blk_end - event.ts_vfs) / 1000 if event.ts_blk_end > 0 else 0.
-        ts_split_start = float(event.ts_split_start - event.ts_vfs) / 1000 if event.ts_split_start > 0 else 0.
-        ts_split_end = float(event.ts_split_end - event.ts_vfs) / 1000 if event.ts_split_end > 0 else 0.
-        ts_merge_start = float(event.ts_merge_start - event.ts_vfs) / 1000 if event.ts_merge_start > 0 else 0.
-        ts_merge_end = float(event.ts_merge_end - event.ts_vfs) / 1000 if event.ts_merge_end > 0 else 0.
+    ts_blk_start = float(event.ts_blk_start - event.ts_vfs) / 1000 if event.ts_blk_start > 0 else 0.
+    ts_blk_end = float(event.ts_blk_end - event.ts_vfs) / 1000 if event.ts_blk_end > 0 else 0.
+    ts_split_start = float(event.ts_split_start - event.ts_vfs) / 1000 if event.ts_split_start > 0 else 0.
+    ts_split_end = float(event.ts_split_end - event.ts_vfs) / 1000 if event.ts_split_end > 0 else 0.
+    ts_merge_start = float(event.ts_merge_start - event.ts_vfs) / 1000 if event.ts_merge_start > 0 else 0.
+    ts_merge_end = float(event.ts_merge_end - event.ts_vfs) / 1000 if event.ts_merge_end > 0 else 0.
 
-        print("[SYSCALL] %6s %6s %9.3f %9.3f %11.3f %10.3f %14.3f %9.3f %8.3f %8.3f %5s %11.3f %9.3f %9.3f %5s %11.3f %9.3f %9.3f %5s %10s %8s %8s %6s" 
-            % (event.pid, event.seq_num, total, float(event.vfs)/1000, float(event.pgcache)/1000, float(event.readpg)/1000, 
-            float(event.ext4readpg)/1000, ts_blk_start, float(event.blk)/1000, ts_blk_end, event.cnt_blk, 
-            ts_split_start, float(event.split)/1000, ts_split_end, event.cnt_split, ts_merge_start, float(event.merge)/1000, 
-            ts_merge_end, event.cnt_merge, event.cmd_name, event.offset, event.size, event.file_name))
+    print("[SYSCALL] %6s %6s %9.3f %9.3f %11.3f %10.3f %14.3f %9.3f %8.3f %8.3f %5s %11.3f %9.3f %9.3f %5s %11.3f %9.3f %9.3f %5s %10s %8s %8s %6s" 
+        % (event.pid, event.seq_num, float(event.total) / 1000, float(event.vfs)/1000, float(event.pgcache)/1000, float(event.readpg)/1000, 
+        float(event.ext4readpg)/1000, ts_blk_start, float(event.blk)/1000, ts_blk_end, event.cnt_blk, 
+        ts_split_start, float(event.split)/1000, ts_split_end, event.cnt_split, ts_merge_start, float(event.merge)/1000, 
+        ts_merge_end, event.cnt_merge, event.cmd_name, event.offset, event.size, event.file_name))
 
 
 # process request events
 def print_rq_event(cpu, data, size):
     event = bpf["rq_events"].event(data)
     total = float(event.queue + event.service) / 1000
-    if total >= (args.rq_thres * 1000):
-        print("[REQUEST] %6s %6s %9.3f %9.3f %11.3f %10.3f %14s %8s %6s" % 
-            (event.pid, event.seq_num, total, float(event.ts_create)/1000, float(event.queue)/1000, 
-            float(event.service)/1000, event.sector, event.len, event.disk_name))
+    print("[REQUEST] %6s %6s %9.3f %9.3f %11.3f %10.3f %14s %8s %6s" % 
+        (event.pid, event.seq_num, total, float(event.ts_create)/1000, float(event.queue)/1000, 
+        float(event.service)/1000, event.sector, event.len, event.disk_name))
 
 
 # loop with callback to print_event

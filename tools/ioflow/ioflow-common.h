@@ -10,6 +10,15 @@
  * 1-Sep-2020   Haoning Chen   Created this.
  */
 
+/* Set default value for time thresholds if they are not specified. */
+#ifndef SYSCALL_THRESHOLD
+#define SYSCALL_THRESHOLD 1000000
+#endif 
+
+#ifndef REQUEST_THRESHOLD
+#define REQUEST_THRESHOLD 200000
+#endif 
+
 /* Value of the bpf map. */
 struct val_t {
     // Identify an syscall IO. All the requests that created by an IO have the same seq_num.

@@ -36,8 +36,10 @@ with open("ioflow-syncwrite.c") as src_f:
 with open("ioflow-common.h") as comm_f:
     comm_text = comm_f.read()
 
+sys_thres_flag = "-DSYSCALL_THRESHOLD=%d" % int(args.sys_thres * 1000000)
+rq_thres_flag = "-DREQUEST_THRESHOLD=%d" % int(args.rq_thres * 1000000)
 # load BPF program
-bpf = BPF(text=bpf_text.replace("[IMPORT_COMM]", comm_text, 1))
+bpf = BPF(text=bpf_text.replace("[IMPORT_COMM]", comm_text, 1), cflags=[sys_thres_flag, rq_thres_flag])
 
 # file system layer:
 bpf.attach_kprobe(event="vfs_write", fn_name="vfs_write_entry")

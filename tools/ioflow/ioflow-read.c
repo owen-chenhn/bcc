@@ -161,7 +161,11 @@ int rq_done(struct pt_regs *ctx, struct request *rq) {
     if (rqvalp) {
         struct rqdata_t rqdata = {0};
         comm_rq_done(&rqdata, rqvalp, ts);
-        rq_events.perf_submit(ctx, &rqdata, sizeof(rqdata));
+        
+        // filter out data that has latency less than the threshold
+        if (rqdata.queue + rqdata.service >= REQUEST_THRESHOLD) {
+            rq_events.perf_submit(ctx, &rqdata, sizeof(rqdata));
+        }
 
         hist_rq_queue.increment(bpf_log2l(rqdata.queue / 1000));
         hist_rq_service.increment(bpf_log2l(rqdata.service / 1000));
@@ -209,7 +213,10 @@ int vfs_read_return(struct pt_regs *ctx) {
     if (valp->ts_ext4readpg != 0 && data.ts_blk_start > valp->ts_ext4readpg)
         data.ext4readpg = data.ts_blk_start - valp->ts_ext4readpg;
     
-    syscall_events.perf_submit(ctx, &data, sizeof(data));
+    // filter out data that has latency less than the threshold
+    if (data.total >= SYSCALL_THRESHOLD) {
+        syscall_events.perf_submit(ctx, &data, sizeof(data));
+    }
     syscall_map.delete(&pid);
 
     // update histograms
