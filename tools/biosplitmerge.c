@@ -146,11 +146,11 @@ int split_return(struct pt_regs *ctx) {
 
 	// obtain r/w flag 
 #ifdef REQ_WRITE      // kernel version < 4.8.0
-	out_data.rwflag = split->bi_rw & REQ_WRITE;
+	out_data.rwflag = split->bi_rw == REQ_WRITE;
 #elif defined(REQ_OP_SHIFT)
-	out_data.rwflag = (split->bi_opf >> REQ_OP_SHIFT) & REQ_OP_WRITE;
+	out_data.rwflag = (split->bi_opf >> REQ_OP_SHIFT) == REQ_OP_WRITE;
 #else
-	out_data.rwflag = (split->bi_opf & REQ_OP_MASK) & REQ_OP_WRITE;
+	out_data.rwflag = (split->bi_opf & REQ_OP_MASK) == REQ_OP_WRITE;
 #endif
 	events.perf_submit(ctx, &out_data, sizeof(out_data));
 	
