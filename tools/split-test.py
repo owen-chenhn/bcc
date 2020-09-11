@@ -10,21 +10,25 @@ bio sector size (in KB) supported by the device (which can be checked via /sys/b
 
 import argparse
 import os
-from subprocess import Popen, PIPE
+import subprocess
+from subprocess import Popen, PIPE, CalledProcessError
 from signal import SIGINT
 from time import sleep
 
 
-def unit_test(target, size):
+def test_split(target, size):
     """
     The unit testing function. It @target device that perform the test to, 
     and requires the maximum bio sector @size of the device. 
+    It returns True if test succeeds otherwise False. 
     """
     tracer_proc = Popen(["./biosplitmerge.py", "-S"], stdout=PIPE)
     sleep(5)
 
-    comm = "dd if=/dev/zero of=%s bs=%dK count=1" % (args.device, 8*args.size)
-    os.system(comm)
+    try:
+        subprocess.check_all(["dd", "if=/dev/zero", "of=%s" % args.device, "bs=%dK" % (8 * args.size), "count=1"])
+    execpt CalledProcessError as e:
+        print("Write command (dd) failed. Return code: %d" % e.returncode)
 
     print("Write finished. Sending Ctrl-C to tracer.")
     tracer_proc.send_signal(SIGINT)
@@ -55,6 +59,4 @@ parser.add_argument("size", type=int,
 
 args = parser.parse_args()
 
-
-unit_test(args.device, args.size)
-
+test_split(args.device, args.size)
