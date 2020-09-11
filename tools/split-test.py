@@ -19,7 +19,6 @@ def unit_test(target, size):
     """
     The unit testing function. It @target device that perform the test to, 
     and requires the maximum bio sector @size of the device. 
-    It returns True if test succeeds otherwise False. 
     """
     tracer_proc = Popen(["./biosplitmerge.py", "-S"], stdout=PIPE)
     sleep(5)
@@ -39,7 +38,7 @@ def unit_test(target, size):
     for line in tracer_proc.stdout.readlines():
         if line.split()[3] == pid:
             count += 1
-    return count == 7
+    assert count == 7
 
 
 examples = """examples:
@@ -57,7 +56,5 @@ parser.add_argument("size", type=int,
 args = parser.parse_args()
 
 
-if unit_test(args.device, args.size):
-    print("Test passed.")
-else:
-    print("Test failed.")
+unit_test(args.device, args.size)
+
