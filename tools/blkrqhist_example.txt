@@ -1,0 +1,52 @@
+Demonstrations of blkrqhist, the Linux eBPF/bcc version.
+
+This tool generates latency histograms for queuing time and service time of block layer
+I/O requests respectively. Here queuing time is the time of the request being queued in 
+kernel, and service time is the time it is processed by device drivers until completion.
+
+The tool can use either kprobe or raw tracepoint to implement the tracing. It uses kprobe 
+by default and can be switched to raw tracepoint via command line flag. 
+
+
+Usage:
+# ./blkrqhist.py       Generate histograms by kprobe tracing.
+# ./blkrqhist.py -T    Use raw tracepoint implementation instead. 
+
+
+Sample output:
+# ./blkrqhist.py
+Tracing I/O requests... Hit Ctrl-C to end.
+^C
+     Queuing time (us)   : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 39       |*                                       |
+         4 -> 7          : 11       |                                        |
+         8 -> 15         : 8        |                                        |
+        16 -> 31         : 4        |                                        |
+        32 -> 63         : 15       |                                        |
+        64 -> 127        : 5        |                                        |
+       128 -> 255        : 250      |*********                               |
+       256 -> 511        : 1026     |****************************************|
+       512 -> 1023       : 282      |**********                              |
+      1024 -> 2047       : 66       |**                                      |
+      2048 -> 4095       : 24       |                                        |
+      4096 -> 8191       : 20       |                                        |
+      8192 -> 16383      : 7        |                                        |
+
+
+     Service time (us)   : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 1        |                                        |
+      1024 -> 2047       : 129      |******                                  |
+      2048 -> 4095       : 724      |*************************************   |
+      4096 -> 8191       : 782      |****************************************|
+      8192 -> 16383      : 117      |*****                                   |
+     16384 -> 32767      : 19       |                                        |
