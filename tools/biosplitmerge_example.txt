@@ -1,0 +1,56 @@
+Demonstrations of biosplitmerge, the Linux eBPF/bcc version.
+
+This tool traces bio struct's split and merge in the block layer. When a bio struct gets split, 
+it is split into two bios; while it gets merged, it is merged into an existing request struct. 
+The tool monitors the split/merge events, and emit the full data of the events when they happen.
+
+For the split, it outputs sector and byte info of both the new bio and the remaining bio. 
+
+Usage:
+# ./biosplitmerge.py       Trace both split and merge events.
+# ./biosplitmerge.py -S    Trace split events only.
+# ./biosplitmerge.py -M    Trace merge events only.
+
+Sample output:
+./biosplitmerge.py
+^C
+TIME(s)     EVENT         COMMAND        PID    DISK    T  IN-SECTOR   IN-BYTES  OUT-SECTOR   OUT-BYTES  REM-SECTOR   REM-BYTES
+0.0000      Split         fio            2514   sdc     W   47431680    2097152    47431680      131072    47431936     1966080
+0.0001      Split         fio            2514   sdc     W   47431936    1966080    47431936      131072    47432192     1835008
+0.0001      Split         fio            2514   sdc     W   47432192    1835008    47432192      131072    47432448     1703936
+0.0001      Split         fio            2514   sdc     W   47432448    1703936    47432448      131072    47432704     1572864
+0.0001      Split         fio            2514   sdc     W   47432704    1572864    47432704      131072    47432960     1441792
+0.0001      Split         fio            2514   sdc     W   47432960    1441792    47432960      131072    47433216     1310720
+0.0001      Split         fio            2514   sdc     W   47433216    1310720    47433216      131072    47433472     1179648
+0.0001      Split         fio            2514   sdc     W   47433472    1179648    47433472      131072    47433728     1048576
+0.0001      Split         fio            2514   sdc     W   47433728    1048576    47433728      131072    47433984      917504
+0.0001      Split         fio            2514   sdc     W   47433984     917504    47433984      131072    47434240      786432
+0.0001      Split         fio            2514   sdc     W   47434240     786432    47434240      131072    47434496      655360
+0.0001      Split         fio            2514   sdc     W   47434496     655360    47434496      131072    47434752      524288
+0.0001      Split         fio            2514   sdc     W   47434752     524288    47434752      131072    47435008      393216
+0.0001      Split         fio            2514   sdc     W   47435008     393216    47435008      131072    47435264      262144
+0.0001      Split         fio            2514   sdc     W   47435264     262144    47435264      131072    47435520      131072
+0.0002      Back Merge    jbd2/sda-8     92     sda     W    8652088       4096     8652080        8192 
+0.0013      Back Merge    jbd2/sda-8     92     sda     W    8652096       4096     8652080       12288 
+0.0014      Back Merge    jbd2/sda-8     92     sda     W    8652104       4096     8652080       16384 
+0.0016      Back Merge    jbd2/sda-8     92     sda     W    8652112       4096     8652080       20480 
+0.0018      Back Merge    jbd2/sda-8     92     sda     W    8652120       4096     8652080       24576 
+0.0021      Back Merge    jbd2/sda-8     92     sda     W    8652128       4096     8652080       28672 
+0.0023      Back Merge    jbd2/sda-8     92     sda     W    8652136       4096     8652080       32768 
+0.0024      Back Merge    jbd2/sda-8     92     sda     W    8652144       4096     8652080       36864 
+0.0026      Back Merge    jbd2/sda-8     92     sda     W    8652152       4096     8652080       40960 
+
+
+The output contains the split/merge event information about:
+"TIME": duration lasted from the first monitored event.
+"EVENT": type of the event. Can be one of: Split, Front Merge, Back Merge, Discard Merge.
+"COMMAND": process command of the event. 
+"PID": process id of the event.
+"DISK": target disk the bio is issued to. 
+"T": read/write io type. 
+"IN-SECTOR": disk sector number of the input bio (the bio that gets split/merged).
+"IN-BYTES": io size of the input bio.
+"OUT-SECTOR": disk sector number of the output bio. For split, it refers to the new bio; For merge, it refers to the request struct that input bio is merged into.
+"OUT-BYTES": io size of the output. Split: io size of the new bio; Merge: size of the output request struct. 
+"REM-SECTOR": sector number of the remaining bio for split events. It has no meaning for merge events.
+"REM-BYTES": io size of the remaining bio (for split events). 
