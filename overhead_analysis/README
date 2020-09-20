@@ -1,0 +1,36 @@
+Scripts used to perform overhead analysis against EBPF tracing and block histogram in-kernel tracing.   
+
+Requirements: 
+1. BCC 
+2. perf 
+3. Fio 
+4. Block histogram patch
+
+Procedures to run the test: 
+1. Run clean.sh to reset the directory. 
+(Backup the intermediate test results in output/, output-ebpf/ and output-blkhist/ ahead, 
+if you don't want to lose them. No need to do this the first time running the test.)
+
+2. Test when block histogram disabled (no-tracing + ebpf tracing): 
+    $ ./run_tests.sh 0 
+
+3. Test when block histogram enabled: 
+    $ ./run_tests.sh 1 
+
+4. The test stat is already in directory stats/ (in both .csv and .json form) 
+Note: the script run_tests.sh automatically splits job files placed in job_files/, runs the tests, and then
+collects test data by running collect_stat.py script if it judges that all three rounds of tests are finished
+(when output/, output-ebpf/ and output-blkhist/ are present). 
+
+5. To obtain analysis results, run collect_stat.py again with analysis mode on: 
+    $ python3 collect_stat.py 1 
+The newest stat csv file in stats/ will contain the analysis results. 
+
+
+Job name format:
+[%iotype-%ioengine-%rwdirection-%blocksize-%iodepth]
+If any field is omitted, default value is used. Default values:
+    iotype: direct. Exceptional case: all mmap io use buffered io, sync=1 and invalidate=1 by default.
+    ioengine: sync
+    blocksize: 4K
+    iodepth: 1. Only when ioengine=libaio, this field has other values
