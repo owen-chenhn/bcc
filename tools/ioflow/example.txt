@@ -1,0 +1,179 @@
+Documentation of ioflow tracers for read and synchronous write system calls. 
+
+This set of tools trace target IO system calls as they get their way through kernel file 
+system (specifically, the EXT4 file system) and the block layer. For now the tool set
+supports the tracing of read and synchronous write system calls, respectively. 
+
+For each type of the system call (read and sync write), it defines several sections and 
+collect time latency of each section that target system call IOs go through as they are 
+issued by the kernel. Besides, the tracer also tracks all the request structs in block layer 
+that are created by the target system call IOs, and collects latency of the queuing and 
+service time. At the end, each section generates its latency histogram as output. The tracers 
+also print timestamp and latency information of some IOs and request structs that take a long time. 
+The time thresholds for system call IOs and requests can be specified as arguments of the tools. 
+
+
+IO Sections:
+Different sections (in the file system layer) are defined for Read and Sync Write system calls. 
+The sections of read and sync write IOs are defined as follow.
+
+Read IOs:
+VFS: Read Vritual File System section. It is the time when read IOs are in kernel VFS layer. 
+PGCACHE: Page Cache section. It is when IOs enter kernel page cache and look for pages. The syscall 
+         returns in this section if target pages are found and the pages are updated. 
+READPG: Read Page section. IOs initiate the read page process from disk. 
+EXT4READPG: EXT4 Read Page section. The read page process is handled by the ext4 implementations (e.g, 
+            ext4_mpage_readpages() function). 
+
+(Note: since both read and write have the same behavior when IOs reach the block layer, the following 
+sections for read IOs are the same as those for sync write IOs.)
+BLK: Block section. The section when IOs enter the block layer via submit_bio() function and initiate
+     request structs from the bio structs that represent upper layer IOs.
+SPLIT: Bio split section. The section when IO requests (bio structs) get split into smaller bios. 
+MERGE: Bio merge section. The section when bios get merged into some existing request structs. 
+
+Sync Write IOs:
+VFS: Write VFS section. 
+EXT4: Ext4_write section. The write functions implemented by the ext4 file system. 
+WRITEPG: Write Page section. This is the section when IO data get written to the pages in page cache. 
+EXT4SYNC: Ext4 Sync section. The section when ext4_file_sync process starts. 
+
+Note: since an upper layer IO may enters the block layer multiple times, and it may have multiple split 
+and merge events, the BLK, SPLIT and Merge sections account the accumulated time of all the bios that 
+issued by the same system call IO. Timestamps of the first-time entry and the last-time exit of the 
+sections are provided in output. Count of the number of times each section is entered during the entire 
+IO is also included in output for each of the three sections. 
+
+The output data for read and sync write IOs also contains user-space info including: pid, command name 
+of the process, IO number (a random sequence number that identifies this IO and all the request structs 
+created by this IO), and file info (file name, offset and IO size). 
+
+
+Request struct info:
+The two tracers also track all the block layer request structs of a particular system call IO. Due to 
+the asynchronous mechanism by which the block layer handles IO requests, each request struct of a target 
+syscall IO emits one line of data to output. The output data of requests contain the following info:
+Create timestamp: the time when this request is created. This is the time deviated from the start of the 
+                  related system call IO. 
+Queue latency: latency that the request is queued in the block layer. 
+Service latency: latency that the request is handled by the corresponding device driver. 
+IO info: sector number, IO size in byte and the target disk name of this request. 
+Syscall info: Pid and the IO number of the system call IO that creates this request. 
+
+
+Usage:
+# ./ioflow-read.py                     Trace read system calls. Default time threshold: 1ms for syscalls and 0.2ms for requests. 
+# ./ioflow-read.py -t 5                Print data if read syscall latency exceeds 5ms or request latency exceeds 0.2ms.
+# ./ioflow-syncwrite.py -s 5 -r 0.5    Set write syscall threshold to 5ms and request threshold to 0.5 ms.
+
+
+Sample output:
+
+./ioflow-read.py -s 1 -r 0.2
+Tracing read I/Os. Time threshold: 1.0 ms for syscalls and 0.2 ms for requests. 
+2 types of emit output with the following formats:
+
+[REQUEST]    PID IO_NUM TOTAL_LAT CREATE_TS   QUEUE_LAT   SERV_LAT         SECTOR      LEN   DISK
+
+[SYSCALL]    PID IO_NUM TOTAL_LAT   VFS_LAT PGCACHE_LAT READPG_LAT EXT4READPG_LAT BLK_START  BLK_LAT  BLK_END COUNT SPLIT_START SPLIT_LAT SPLIT_END COUNT MERGE_START MERGE_LAT MERGE_END COUNT    COMMAND   OFFSET     SIZE   FILE
+
+Hit Ctrl-C to end and display histograms.
+
+[REQUEST]   8597 514153   945.730   167.528      26.282    919.448       71581952   131072    sdi
+[REQUEST]   8597 514153   968.256   156.002      16.740    951.516       71581696   131072    sdi
+[REQUEST]   8597 514153   934.837   192.309       6.481    928.356       71582208   131072    sdi
+[REQUEST]   8597 514153   950.846   197.498       6.303    944.543       71582464   131072    sdi
+...
+[REQUEST]   8595 173373   876.064   103.326       7.324    868.740       47186432   131072    sdi
+[REQUEST]   8595 173373   910.829   109.584       7.225    903.604       47186688   131072    sdi
+[REQUEST]   8597 514153   304.284  5770.352      12.972    291.312       71588608   131072    sdi
+[REQUEST]   8597 514153   404.194  5768.671       3.716    400.478       71588352   131072    sdi
+[REQUEST]   8595 173373   534.886  1272.354      13.899    520.987       47187200   131072    sdi
+...
+[SYSCALL]   8597 514153  7136.844     4.607       2.136     12.387         48.607    67.737  378.479 6916.071    34     118.455    41.834  6889.634    18       0.000     0.000     0.000     0        fio        0  4194304 f3.img
+[SYSCALL]   8595 173373  7589.846     3.190       1.383     11.012         55.383    70.968  310.173 6479.045    34      74.855    13.771  6464.276    18       0.000     0.000     0.000     0        fio        0  4194304 f1.img
+[REQUEST]   8595 173373   421.849  2052.954       3.915    417.934       47187968   131072    sdi
+[REQUEST]   8596 867904   481.767    46.450      11.556    470.211       71590656   131072    sdi
+[REQUEST]   8596 867904   407.234   290.987       3.370    403.864       71590912   131072    sdi
+[SYSCALL]   8596 867904  9161.717     1.067       0.486     18.129         22.372    42.054  274.688 9085.409    32      43.368    10.407  9073.412    16       0.000     0.000     0.000     0        fio  4194304  4194304 f2.img
+...
+
+^C 
+
+        VFS (us)         : count     distribution
+         0 -> 1          : 943      |****************************************|
+         2 -> 3          : 34       |*                                       |
+         4 -> 7          : 13       |                                        |
+         8 -> 15         : 1        |                                        |
+        16 -> 31         : 1        |                                        |
+
+     Page Cache Entry (us) : count     distribution
+         0 -> 1          : 961      |****************************************|
+         2 -> 3          : 28       |*                                       |
+         4 -> 7          : 1        |                                        |
+         8 -> 15         : 1        |                                        |
+        16 -> 31         : 1        |                                        |
+
+     Read Page (us)      : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 523      |****************************************|
+         8 -> 15         : 372      |****************************            |
+        16 -> 31         : 26       |*                                       |
+        32 -> 63         : 1        |                                        |
+
+     EXT4 Read Page (us) : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 307      |*********************                   |
+        16 -> 31         : 579      |****************************************|
+        32 -> 63         : 36       |**                                      |
+
+     Block Entry (us)    : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 290      |******************                      |
+       256 -> 511        : 632      |****************************************|
+
+     Bio Split (us)      : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 2        |                                        |
+         8 -> 15         : 876      |****************************************|
+        16 -> 31         : 41       |*                                       |
+        32 -> 63         : 3        |                                        |
+
+
+     Request Queue (us)  : count     distribution
+         0 -> 1          : 4        |                                        |
+         2 -> 3          : 5005     |*****************                       |
+         4 -> 7          : 9548     |*********************************       |
+         8 -> 15         : 11555    |****************************************|
+        16 -> 31         : 2942     |**********                              |
+        32 -> 63         : 204      |                                        |
+        64 -> 127        : 7        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 9        |                                        |
+
+     Request Service (us) : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 62       |                                        |
+       512 -> 1023       : 177      |                                        |
+      1024 -> 2047       : 5764     |*********                               |
+      2048 -> 4095       : 23372    |****************************************|
+      4096 -> 8191       : 2        |                                        |
